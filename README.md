@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.png" alt="Railscale" width="200">
+</p>
+
 # Railscale
 
 A scriptable, Tailscale-native network service. Lua scripts define **carriages** — independent Tailscale nodes, each with its own hostname and forwarding pipeline. Railscale reads the scripts and brings them to life on the tailnet.
