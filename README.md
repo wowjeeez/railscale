@@ -1,11 +1,17 @@
 # Railscale
 
-A scriptable, Tailscale-native network service. Each **carriage** is an independent Tailscale node with its own hostname, running a configurable proxy forwarding pipeline. Behavior is scripted via Lua.
+A scriptable, Tailscale-native network service. Lua scripts define **carriages** — independent Tailscale nodes, each with its own hostname and forwarding pipeline. Railscale reads the scripts and brings them to life on the tailnet.
 
 ## Architecture
 
 ```mermaid
 graph TB
+    LUA[Lua Scripts] -->|define| RS[Railscale Engine]
+    RS -->|spawns| C1
+    RS -->|spawns| C2
+    RS -->|spawns| C3
+    RS -->|spawns| DNS
+
     subgraph Tailnet
         C1[carriage-alpha.tailnet.ts.net]
         C2[carriage-beta.tailnet.ts.net]
@@ -13,23 +19,18 @@ graph TB
         DNS[dns.tailnet.ts.net]
     end
 
-    C1 --> P1[Proxy Pipeline]
-    C2 --> P2[Proxy Pipeline]
-    C3 --> P3[Proxy Pipeline]
-    DNS --> R[DNS Forwarder]
-
-    subgraph "Carriage Pipeline"
-        direction LR
-        L[CarriageListener] --> D[DataFrameProducer] --> F[FrameConductor] --> E[DisembarkStrategy]
-    end
+    C1 -->|forwards to| U1[upstream:8080]
+    C2 -->|forwards to| U2[upstream:443]
+    C3 -->|forwards to| U3[upstream:5432]
+    DNS -->|resolves via| U4[upstream DNS]
 
     style Tailnet fill:#1a1a2e,color:#fff
-    style DNS fill:#2d4a22,color:#fff
+    style LUA fill:#2d4a22,color:#fff
 ```
 
 ## Carriage Pipeline
 
-Each carriage runs the same four-stage pipeline:
+Each carriage spawned by a Lua script runs a four-stage pipeline:
 
 ```mermaid
 graph LR
@@ -38,20 +39,18 @@ graph LR
     C -->|parsed frames| D(FrameConductor)
     D -->|inspected frames| E(DisembarkStrategy)
     E -->|forwarded| F[Upstream Target]
-
-    D -.-|pass/reject| G[Lua Script]
 ```
 
 | Stage | Trait | Role |
 |-------|-------|------|
 | **Listen** | `CarriageListener` | Accept connections on this carriage's tailnet address |
 | **Parse** | `DataFrameProducer` | Read and buffer frames from the connection |
-| **Inspect** | `FrameConductor` | Evaluate frames against rules (Lua-scriptable) |
+| **Inspect** | `FrameConductor` | Evaluate frames — pass, reject, or transform |
 | **Forward** | `DisembarkStrategy` | Write frames to the upstream destination |
 
 ## Key Concepts
 
-- **Carriage** -- a self-contained Tailscale service with its own hostname, its own listener, and its own forwarding rules
-- **DNS Server** -- runs as a separate service, not part of the carriage pipeline
-- **Lua scripting** -- defines per-carriage behavior: routing, filtering, inspection logic
-- **rsnet** -- Rust Tailscale integration, each carriage gets its own `rsnet` instance
+- **Lua scripts** -- the source of truth. They declare carriages, their hostnames, ingress types, and forwarding targets. Railscale is the runtime that executes them.
+- **Carriage** -- a self-contained Tailscale service with its own hostname and forwarding pipeline, defined in Lua
+- **DNS Server** -- a separate Tailscale service for DNS forwarding, also defined in Lua
+- **rsnet** -- Rust Tailscale integration; each carriage gets its own `rsnet` instance
