@@ -3,6 +3,14 @@ name = "rail_proto"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = []
+tailscale = []  # enable once rsnet is wired in
+
+[[bin]]
+name = "railscale"
+path = "src/main.rs"
+
 [dependencies]
 async-trait = {workspace = true}
 tokio = {workspace = true}

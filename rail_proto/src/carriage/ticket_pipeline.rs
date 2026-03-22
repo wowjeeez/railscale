@@ -6,12 +6,19 @@ use tokio_util::codec::{Decoder, FramedRead};
 use crate::carriage::gate::{Stamp, TicketGate};
 use crate::carriage::manifest::Manifest;
 
+#[derive(Debug)]
 pub enum BufferedField {
+    /// Known protocol-level fields with static keys (e.g., "tls_version", "content_type")
     KeyValue(&'static str, &'static str),
+    /// Dynamic key-value pairs from protocol headers (e.g., HTTP headers, TLS extensions)
+    Header(String, String),
+    /// Standalone protocol values (e.g., HTTP method, path)
     Attribute(String),
+    /// Raw buffered bytes when structured parsing isn't applicable
     Bytes(Bytes),
 }
 
+#[derive(Debug)]
 pub enum TicketField {
     Buffered(BufferedField),
     Passthrough(Bytes),
