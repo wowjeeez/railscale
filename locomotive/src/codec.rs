@@ -2,6 +2,7 @@ use bytes::{Buf, Bytes, BytesMut};
 use memchr::memmem::Finder;
 use rayon::prelude::*;
 use tokio_util::codec::Decoder;
+use std::io;
 use crate::HttpFrame;
 
 fn find_crlf(buf: &[u8]) -> Option<usize> {
@@ -38,9 +39,16 @@ impl HttpStreamingCodec {
 
 impl Decoder for HttpStreamingCodec {
     type Item = HttpFrame;
-    type Error = std::io::Error;
+    type Error = io::Error;
 
-    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        if self.done {
+            return Ok(None);
+        }
+        self.decode(buf)
+    }
+
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, io::Error> {
         if self.done || src.is_empty() {
             return Ok(None);
         }
