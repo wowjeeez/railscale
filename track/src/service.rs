@@ -1,62 +1,116 @@
 use std::pin::pin;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Instant;
-use opentelemetry::global;
-use opentelemetry::metrics::{Counter, Histogram, UpDownCounter};
 use tokio_stream::StreamExt;
 use tracing::warn;
 use crate::destination::StreamDestination;
 use crate::frame::{Frame, ParsedData};
 use crate::parser::FrameParser;
 use crate::pipeline::FramePipeline;
-use crate::sampler::{RequestRecord, SamplerHandle};
 use crate::source::StreamSource;
 use crate::RailscaleError;
+
+#[cfg(feature = "metrics-full")]
+use std::sync::atomic::Ordering;
+#[cfg(feature = "metrics-full")]
+use crate::sampler::{RequestRecord, SamplerHandle};
 
 pub trait Service: Send + Sync {
     fn run(&self) -> impl std::future::Future<Output = Result<(), RailscaleError>> + Send;
 }
 
-struct OtelMetrics {
-    connections_total: Counter<u64>,
-    connections_active: UpDownCounter<i64>,
-    connection_errors: Counter<u64>,
-    connection_duration: Histogram<f64>,
-    request_forward_duration: Histogram<f64>,
-    upstream_connect_duration: Histogram<f64>,
-    response_relay_duration: Histogram<f64>,
-    response_bytes: Histogram<f64>,
-    frames_parsed: Counter<u64>,
-    bytes_passthrough: Counter<u64>,
-}
+#[cfg(feature = "metrics-minimal")]
+mod otel {
+    use opentelemetry::global;
+    use opentelemetry::metrics::{Counter, Histogram, UpDownCounter};
 
-impl OtelMetrics {
-    fn new() -> Self {
-        let meter = global::meter("railscale");
-        let latency_buckets = vec![0.0001, 0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 5.0, 10.0];
-        let size_buckets = vec![64.0, 256.0, 1024.0, 4096.0, 16384.0, 65536.0, 262144.0, 1048576.0];
+    pub(crate) struct OtelMetrics {
+        connections_total: Counter<u64>,
+        connections_active: UpDownCounter<i64>,
+        connection_errors: Counter<u64>,
+        connection_duration: Histogram<f64>,
+        request_forward_duration: Histogram<f64>,
+        upstream_connect_duration: Histogram<f64>,
+        response_relay_duration: Histogram<f64>,
+        response_bytes: Histogram<f64>,
+        frames_parsed: Counter<u64>,
+        bytes_passthrough: Counter<u64>,
+    }
 
-        Self {
-            connections_total: meter.u64_counter("railscale.connections_total").build(),
-            connections_active: meter.i64_up_down_counter("railscale.connections_active").build(),
-            connection_errors: meter.u64_counter("railscale.connection_errors").build(),
-            connection_duration: meter.f64_histogram("railscale.connection_duration_seconds")
-                .with_boundaries(latency_buckets.clone()).build(),
-            request_forward_duration: meter.f64_histogram("railscale.request_forward_duration_seconds")
-                .with_boundaries(latency_buckets.clone()).build(),
-            upstream_connect_duration: meter.f64_histogram("railscale.upstream_connect_duration_seconds")
-                .with_boundaries(latency_buckets.clone()).build(),
-            response_relay_duration: meter.f64_histogram("railscale.response_relay_duration_seconds")
-                .with_boundaries(latency_buckets).build(),
-            response_bytes: meter.f64_histogram("railscale.response_bytes")
-                .with_boundaries(size_buckets).build(),
-            frames_parsed: meter.u64_counter("railscale.frames_parsed").build(),
-            bytes_passthrough: meter.u64_counter("railscale.bytes_passthrough").build(),
+    impl OtelMetrics {
+        pub fn new() -> Self {
+            let meter = global::meter("railscale");
+            let latency_buckets = vec![0.0001, 0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 5.0, 10.0];
+            let size_buckets = vec![64.0, 256.0, 1024.0, 4096.0, 16384.0, 65536.0, 262144.0, 1048576.0];
+
+            Self {
+                connections_total: meter.u64_counter("railscale.connections_total").build(),
+                connections_active: meter.i64_up_down_counter("railscale.connections_active").build(),
+                connection_errors: meter.u64_counter("railscale.connection_errors").build(),
+                connection_duration: meter.f64_histogram("railscale.connection_duration_seconds")
+                    .with_boundaries(latency_buckets.clone()).build(),
+                request_forward_duration: meter.f64_histogram("railscale.request_forward_duration_seconds")
+                    .with_boundaries(latency_buckets.clone()).build(),
+                upstream_connect_duration: meter.f64_histogram("railscale.upstream_connect_duration_seconds")
+                    .with_boundaries(latency_buckets.clone()).build(),
+                response_relay_duration: meter.f64_histogram("railscale.response_relay_duration_seconds")
+                    .with_boundaries(latency_buckets).build(),
+                response_bytes: meter.f64_histogram("railscale.response_bytes")
+                    .with_boundaries(size_buckets).build(),
+                frames_parsed: meter.u64_counter("railscale.frames_parsed").build(),
+                bytes_passthrough: meter.u64_counter("railscale.bytes_passthrough").build(),
+            }
+        }
+
+        pub fn conn_start(&self) {
+            self.connections_active.add(1, &[]);
+            self.connections_total.add(1, &[]);
+        }
+
+        pub fn conn_end(&self, duration: f64) {
+            self.connections_active.add(-1, &[]);
+            self.connection_duration.record(duration, &[]);
+        }
+
+        pub fn conn_error(&self) {
+            self.connection_errors.add(1, &[]);
+        }
+
+        pub fn forward_done(&self, duration: f64, frames: u64, passthrough_bytes: u64) {
+            self.request_forward_duration.record(duration, &[]);
+            self.frames_parsed.add(frames, &[]);
+            self.bytes_passthrough.add(passthrough_bytes, &[]);
+        }
+
+        pub fn upstream_connected(&self, duration: f64) {
+            self.upstream_connect_duration.record(duration, &[]);
+        }
+
+        pub fn relay_done(&self, duration: f64, bytes: u64) {
+            self.response_relay_duration.record(duration, &[]);
+            self.response_bytes.record(bytes as f64, &[]);
         }
     }
 }
 
+#[cfg(not(feature = "metrics-minimal"))]
+mod otel {
+    pub(crate) struct OtelMetrics;
+
+    impl OtelMetrics {
+        pub fn new() -> Self { Self }
+        #[inline(always)] pub fn conn_start(&self) {}
+        #[inline(always)] pub fn conn_end(&self, _: f64) {}
+        #[inline(always)] pub fn conn_error(&self) {}
+        #[inline(always)] pub fn forward_done(&self, _: f64, _: u64, _: u64) {}
+        #[inline(always)] pub fn upstream_connected(&self, _: f64) {}
+        #[inline(always)] pub fn relay_done(&self, _: f64, _: u64) {}
+    }
+}
+
+use otel::OtelMetrics;
+
+#[cfg_attr(not(feature = "metrics-full"), allow(dead_code))]
 struct ConnectionResult {
     forward_duration: f64,
     connect_duration: f64,
@@ -77,6 +131,7 @@ where
     pub parser_factory: fn() -> Par,
     pub pipeline: Arc<Pip>,
     pub destination_factory: fn() -> Dst,
+    #[cfg(feature = "metrics-full")]
     pub sampler: Option<Arc<SamplerHandle>>,
 }
 
@@ -94,14 +149,14 @@ where
         pipeline: Arc<Pip>,
         destination_factory: fn() -> Dst,
         otel: Arc<OtelMetrics>,
-        sampler: Option<Arc<SamplerHandle>>,
-        start_time: Instant,
+        #[cfg(feature = "metrics-full")] sampler: Option<Arc<SamplerHandle>>,
+        #[cfg(feature = "metrics-full")] start_time: Instant,
     ) {
+        #[cfg(feature = "metrics-full")]
         if let Some(ref s) = sampler {
             s.shared().active_connections.fetch_add(1, Ordering::Relaxed);
         }
-        otel.connections_active.add(1, &[]);
-        otel.connections_total.add(1, &[]);
+        otel.conn_start();
 
         let conn_start = Instant::now();
         let result = Self::do_connection(
@@ -109,31 +164,33 @@ where
         ).await;
 
         let total_duration = conn_start.elapsed().as_secs_f64();
-        otel.connections_active.add(-1, &[]);
-        otel.connection_duration.record(total_duration, &[]);
+        otel.conn_end(total_duration);
 
+        #[cfg(feature = "metrics-full")]
         if let Some(ref s) = sampler {
             s.shared().active_connections.fetch_add(-1, Ordering::Relaxed);
         }
 
         match result {
-            Ok(cr) => {
+            Ok(_cr) => {
+                #[cfg(feature = "metrics-full")]
                 if let Some(s) = sampler {
                     s.log_request(RequestRecord {
                         t: start_time.elapsed().as_secs_f64(),
                         total_us: (total_duration * 1e6) as u64,
-                        connect_us: (cr.connect_duration * 1e6) as u64,
-                        forward_us: (cr.forward_duration * 1e6) as u64,
-                        relay_us: (cr.relay_duration * 1e6) as u64,
-                        frames: cr.frame_count,
-                        req_bytes: cr.request_bytes,
-                        resp_bytes: cr.response_bytes,
+                        connect_us: (_cr.connect_duration * 1e6) as u64,
+                        forward_us: (_cr.forward_duration * 1e6) as u64,
+                        relay_us: (_cr.relay_duration * 1e6) as u64,
+                        frames: _cr.frame_count,
+                        req_bytes: _cr.request_bytes,
+                        resp_bytes: _cr.response_bytes,
                         error: false,
                     });
                 }
             }
             Err(e) => {
-                otel.connection_errors.add(1, &[]);
+                otel.conn_error();
+                #[cfg(feature = "metrics-full")]
                 if let Some(s) = sampler {
                     s.log_request(RequestRecord {
                         t: start_time.elapsed().as_secs_f64(),
@@ -185,7 +242,7 @@ where
                         let connect_start = Instant::now();
                         dest.provide(&frame).await.map_err(Into::into)?;
                         connect_duration = connect_start.elapsed().as_secs_f64();
-                        otel.upstream_connect_duration.record(connect_duration, &[]);
+                        otel.upstream_connected(connect_duration);
                         routed = true;
                     }
                     let frame = pipeline.process(frame);
@@ -199,15 +256,12 @@ where
         }
 
         let forward_duration = forward_start.elapsed().as_secs_f64();
-        otel.request_forward_duration.record(forward_duration, &[]);
-        otel.frames_parsed.add(frame_count, &[]);
-        otel.bytes_passthrough.add(passthrough_bytes, &[]);
+        otel.forward_done(forward_duration, frame_count, passthrough_bytes);
 
         let relay_start = Instant::now();
         let response_bytes = dest.relay_response(write_half).await.map_err(Into::into)?;
         let relay_duration = relay_start.elapsed().as_secs_f64();
-        otel.response_relay_duration.record(relay_duration, &[]);
-        otel.response_bytes.record(response_bytes as f64, &[]);
+        otel.relay_done(relay_duration, response_bytes);
 
         Ok(ConnectionResult {
             forward_duration,
@@ -232,7 +286,9 @@ where
 {
     async fn run(&self) -> Result<(), RailscaleError> {
         let otel = Arc::new(OtelMetrics::new());
+        #[cfg(feature = "metrics-full")]
         let sampler = self.sampler.clone();
+        #[cfg(feature = "metrics-full")]
         let start_time = Instant::now();
 
         loop {
@@ -241,11 +297,14 @@ where
             let destination_factory = self.destination_factory;
             let pipeline = Arc::clone(&self.pipeline);
             let otel = Arc::clone(&otel);
+            #[cfg(feature = "metrics-full")]
             let sampler = sampler.clone();
 
             tokio::spawn(Self::handle_connection(
                 read_half, write_half, parser_factory, pipeline, destination_factory,
-                otel, sampler, start_time,
+                otel,
+                #[cfg(feature = "metrics-full")] sampler,
+                #[cfg(feature = "metrics-full")] start_time,
             ));
         }
     }

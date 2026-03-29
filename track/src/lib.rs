@@ -3,6 +3,7 @@ mod error;
 mod frame;
 mod parser;
 mod pipeline;
+#[cfg(feature = "metrics-full")]
 pub mod sampler;
 mod service;
 mod source;

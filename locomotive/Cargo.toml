@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-train_track = { path = "../track" }
+train_track = { path = "../track", default-features = false }
 bytes = { workspace = true }
 memchr = { workspace = true }
 rayon = { workspace = true }
@@ -14,11 +14,14 @@ tokio-util = { workspace = true }
 pin-project-lite = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-opentelemetry = { workspace = true }
-opentelemetry_sdk = { workspace = true }
-opentelemetry-stdout = { workspace = true }
+opentelemetry = { workspace = true, optional = true }
+opentelemetry_sdk = { workspace = true, optional = true }
+opentelemetry-stdout = { workspace = true, optional = true }
 hotpath = "0.14"
 
-
 [features]
+default = ["metrics-minimal"]
+metrics-minimal = ["train_track/metrics-minimal", "dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-stdout"]
+metrics-full = ["metrics-minimal", "train_track/metrics-full"]
+metrics-erased = ["train_track/metrics-erased"]
 hotpath = ["hotpath/hotpath", "hotpath/tokio"]

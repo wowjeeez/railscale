@@ -9,11 +9,14 @@ tokio = { workspace = true }
 tokio-stream = { workspace = true }
 pin-project-lite = { workspace = true }
 tracing = { workspace = true }
-opentelemetry = { workspace = true }
-sysinfo = { workspace = true }
+opentelemetry = { workspace = true, optional = true }
+sysinfo = { workspace = true, optional = true }
 
 hotpath = "0.14"
 
-
 [features]
+default = ["metrics-minimal"]
+metrics-minimal = ["dep:opentelemetry"]
+metrics-full = ["metrics-minimal", "dep:sysinfo"]
+metrics-erased = []
 hotpath = ["hotpath/hotpath", "hotpath/tokio"]
