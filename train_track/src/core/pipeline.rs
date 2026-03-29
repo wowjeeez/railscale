@@ -1,4 +1,4 @@
-use crate::frame::Frame;
+use crate::atom::frame::Frame;
 
 pub trait FramePipeline: Send + Sync {
     type Frame: Frame;

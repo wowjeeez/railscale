@@ -10,7 +10,6 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio_stream::StreamExt;
 use crate::stream::{MappedFrame, MappedHttpStream};
 
-#[hotpath::measure]
 async fn handle_stream(mut stream: TcpStream, addr: SocketAddr) {
     let start = Instant::now();
     let (read, mut write) = stream.split();
@@ -49,7 +48,6 @@ async fn handle_stream(mut stream: TcpStream, addr: SocketAddr) {
 }
 
 #[tokio::main]
-#[hotpath::main]
 async fn main() {
     let addr = "127.0.0.1:8080";
     let listener = TcpListener::bind(addr).await.unwrap();

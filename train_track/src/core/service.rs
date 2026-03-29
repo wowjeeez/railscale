@@ -3,11 +3,11 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio_stream::StreamExt;
 use tracing::warn;
-use crate::destination::StreamDestination;
-use crate::frame::{Frame, ParsedData};
-use crate::parser::FrameParser;
-use crate::pipeline::FramePipeline;
-use crate::source::StreamSource;
+use crate::io::destination::StreamDestination;
+use crate::atom::frame::{Frame, ParsedData};
+use crate::atom::parser::FrameParser;
+use crate::core::pipeline::FramePipeline;
+use crate::io::source::StreamSource;
 use crate::RailscaleError;
 
 #[cfg(feature = "metrics-full")]

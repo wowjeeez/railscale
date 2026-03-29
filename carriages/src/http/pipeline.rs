@@ -14,11 +14,9 @@ impl HttpPipeline {
     }
 }
 
-#[hotpath::measure_all]
 impl FramePipeline for HttpPipeline {
     type Frame = HttpFrame;
 
-    #[hotpath::measure]
     fn process(&self, frame: Self::Frame) -> Self::Frame {
         if self.matchers.is_empty() {
             return frame;

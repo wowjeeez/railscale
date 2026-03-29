@@ -34,7 +34,6 @@ impl<T: AsyncRead> MappedHttpStream<T> {
 impl<T: AsyncRead + Unpin> Stream for MappedHttpStream<T> {
     type Item = Result<MappedFrame, tokio::io::Error>;
 
-    #[hotpath::measure]
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
 

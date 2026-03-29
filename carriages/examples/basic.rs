@@ -25,9 +25,7 @@ fn init_metrics() -> opentelemetry_sdk::metrics::SdkMeterProvider {
 }
 
 #[tokio::main]
-#[hotpath::main]
 async fn main() {
-    hotpath::tokio_runtime!();
     tracing_subscriber::fmt()
         .with_target(false)
         .with_env_filter("warn")

@@ -7,7 +7,7 @@ use tokio::io::AsyncRead;
 use tokio_stream::Stream;
 use tokio_util::codec::FramedRead;
 use train_track::{FrameParser, ParsedData};
-use crate::codec::HttpStreamingCodec;
+use crate::http::codec::HttpStreamingCodec;
 use crate::HttpFrame;
 
 pub struct HttpParser {
@@ -40,7 +40,6 @@ fn drain_buffer<T: AsyncRead + Unpin>(
     }
 }
 
-#[hotpath::measure_all]
 impl<T: AsyncRead + Unpin> Stream for HttpFrameStream<T> {
     type Item = Result<ParsedData<HttpFrame>, std::io::Error>;
 
@@ -73,12 +72,10 @@ impl<T: AsyncRead + Unpin> Stream for HttpFrameStream<T> {
     }
 }
 
-#[hotpath::measure_all]
 impl<S: AsyncRead + Send + Unpin> FrameParser<S> for HttpParser {
     type Frame = HttpFrame;
     type Error = std::io::Error;
 
-    #[hotpath::measure]
     fn parse(&mut self, stream: S) -> impl Stream<Item = Result<ParsedData<Self::Frame>, Self::Error>> + Send {
         let codec = HttpStreamingCodec::new(self.matchers.clone());
         HttpFrameStream {

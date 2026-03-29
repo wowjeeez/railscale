@@ -11,12 +11,12 @@ pin-project-lite = { workspace = true }
 tracing = { workspace = true }
 opentelemetry = { workspace = true, optional = true }
 sysinfo = { workspace = true, optional = true }
-
-hotpath = "0.14"
+memmap2 = {workspace = true}
+async-trait = {workspace = true}
+rayon = {workspace = true}
 
 [features]
 default = ["metrics-minimal"]
 metrics-minimal = ["dep:opentelemetry"]
 metrics-full = ["metrics-minimal", "dep:sysinfo"]
 metrics-erased = []
-hotpath = ["hotpath/hotpath", "hotpath/tokio"]

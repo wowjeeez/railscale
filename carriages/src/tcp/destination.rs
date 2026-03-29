@@ -10,7 +10,6 @@ pub struct TcpDestination {
     headers_sent: bool,
 }
 
-#[hotpath::measure_all]
 impl TcpDestination {
     pub fn new() -> Self {
         Self { upstream: None, fixed_addr: None, headers_sent: false }
@@ -21,7 +20,8 @@ impl TcpDestination {
     }
 }
 
-#[hotpath::measure_all]
+
+#[async_trait::async_trait]
 impl StreamDestination for TcpDestination {
     type Frame = HttpFrame;
     type Error = std::io::Error;
