@@ -13,3 +13,5 @@ pub use atom::parser::FrameParser;
 pub use core::pipeline::FramePipeline;
 pub use core::service::{Pipeline, Service};
 pub use io::source::StreamSource;
+pub use destinations::route::{DomainMatcher, RouterDestination, MemchrDomainMatcher, MatchStrategy};
+pub use destinations::file::{FileDestination, FrameSerializer, DefaultFrameSerializer};
