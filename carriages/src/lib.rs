@@ -7,3 +7,4 @@ pub use tcp::source::TcpSource;
 pub use http::parser::HttpParser;
 pub use http::pipeline::HttpPipeline;
 pub use tcp::destination::TcpDestination;
+pub use tcp::router::TcpRouter;

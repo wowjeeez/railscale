@@ -5,6 +5,7 @@ pub enum RailscaleError {
     Parse(String),
     RoutingFailed(String),
     ConnectionClosed,
+    NoRoutingFrame,
 }
 
 impl fmt::Display for RailscaleError {
@@ -14,6 +15,7 @@ impl fmt::Display for RailscaleError {
             Self::Parse(msg) => write!(f, "parse: {msg}"),
             Self::RoutingFailed(msg) => write!(f, "routing failed: {msg}"),
             Self::ConnectionClosed => write!(f, "connection closed"),
+            Self::NoRoutingFrame => write!(f, "no routing frame received"),
         }
     }
 }

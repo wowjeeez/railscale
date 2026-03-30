@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use memchr::memmem::Finder;
 use train_track::{Frame, FramePipeline};
-use locomotive::{HttpFrame, HttpPipeline};
+use carriages::{HttpFrame, HttpPipeline};
 
 #[test]
 fn first_match_wins() {

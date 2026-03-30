@@ -35,7 +35,7 @@ impl FramePipeline for HttpPipeline {
         });
 
         match replaced {
-            Some(bytes) => HttpFrame::header(bytes, frame.is_routing_frame()),
+            Some(bytes) => HttpFrame::header(bytes, frame.routing_key().is_some()),
             None => frame,
         }
     }

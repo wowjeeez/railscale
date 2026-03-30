@@ -1,11 +1,10 @@
-use std::pin::pin;
+use std::sync::Arc;
 use bytes::Bytes;
 use memchr::memmem::Finder;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio_stream::StreamExt;
 use train_track::*;
-use locomotive::*;
+use carriages::*;
 
 #[tokio::test]
 async fn full_http_pipeline_end_to_end() {
@@ -29,34 +28,23 @@ async fn full_http_pipeline_end_to_end() {
         (Finder::new(b"User-Agent"), Bytes::from_static(b"railscale/1.0")),
     ];
 
-    let pipeline = HttpPipeline::new(matchers);
+    let router = Arc::new(TcpRouter::fixed(upstream_addr.to_string()));
+    let pipeline_proc = Arc::new(HttpPipeline::new(matchers));
 
     let proxy_join = tokio::spawn(async move {
-        let stream = source.accept().await.unwrap();
-        let mut parser = HttpParser::new(vec![]);
-        let mut dest = TcpDestination::new();
+        let pipeline = Pipeline {
+            source,
+            parser_factory: || HttpParser::new(vec![]),
+            pipeline: pipeline_proc,
+            router,
+            #[cfg(feature = "metrics-full")]
+            sampler: None,
+        };
 
-        let frames = parser.parse(stream);
-        let mut frames = pin!(frames);
-        let mut routed = false;
-
-        while let Some(Ok(item)) = frames.next().await {
-            match item {
-                ParsedData::Passthrough(bytes) => {
-                    dest.write_raw(bytes).await.unwrap();
-                }
-                ParsedData::Parsed(frame) => {
-                    if frame.is_routing_frame() && !routed {
-                        dest.provide_with_addr(&upstream_addr).await.unwrap();
-                        routed = true;
-                    }
-                    let frame = pipeline.process(frame);
-                    dest.write(frame).await.unwrap();
-                    dest.write_raw(Bytes::from_static(b"\r\n")).await.unwrap();
-                }
-            }
-        }
+        pipeline.run().await
     });
+
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
     let mut client = TcpStream::connect(proxy_addr).await.unwrap();
     client.write_all(
@@ -72,5 +60,5 @@ async fn full_http_pipeline_end_to_end() {
     assert!(received_str.contains("User-Agent: railscale/1.0"));
     assert!(!received_str.contains("curl/7.0"));
 
-    let _ = proxy_join.await;
+    proxy_join.abort();
 }

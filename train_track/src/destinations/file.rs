@@ -1,68 +1,53 @@
 use std::io::{BufWriter, Write};
-use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::fs::File;
-use std::time::SystemTime;
 use bytes::Bytes;
 use tokio::io::AsyncWrite;
-use crate::{Frame, StreamDestination};
+use crate::StreamDestination;
 
-pub struct FileDestination<T: Frame, FS: FrameSerializer<T> = DefaultFrameSerializer<T>> {
+pub struct FileDestination {
     writer: BufWriter<File>,
-    serializer: FS,
-    _t: PhantomData<T>,
+    serializer: Box<dyn FrameSerializer + Send>,
 }
 
-impl<T: Frame, FS: FrameSerializer<T>> FileDestination<T, FS> {
+impl FileDestination {
     pub fn new(path: PathBuf) -> std::io::Result<Self> {
         let file = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(path)?;
-        Ok(Self { _t: PhantomData, writer: BufWriter::new(file), serializer: FS::init() })
+        Ok(Self { writer: BufWriter::new(file), serializer: Box::new(DefaultFrameSerializer) })
+    }
+
+    pub fn with_serializer(path: PathBuf, serializer: Box<dyn FrameSerializer + Send>) -> std::io::Result<Self> {
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)?;
+        Ok(Self { writer: BufWriter::new(file), serializer })
     }
 }
 
-pub trait FrameSerializer<T: Frame>: Send + Sync {
-    fn serialize(&self, frame: &T) -> Result<impl Into<Bytes>, std::io::Error>;
-    fn init() -> Self;
+pub trait FrameSerializer: Send + Sync {
+    fn serialize(&self, bytes: &[u8]) -> Result<Bytes, std::io::Error>;
 }
 
-pub struct DefaultFrameSerializer<T: Frame>(PhantomData<T>);
+pub struct DefaultFrameSerializer;
 
-impl<T: Frame + Send + Sync> FrameSerializer<T> for DefaultFrameSerializer<T> {
-    fn serialize(&self, frame: &T) -> Result<impl Into<Bytes>, std::io::Error> {
-        Ok(String::from_utf8_lossy(frame.as_bytes()).to_string())
-    }
-
-    fn init() -> Self {
-        Self(PhantomData)
+impl FrameSerializer for DefaultFrameSerializer {
+    fn serialize(&self, bytes: &[u8]) -> Result<Bytes, std::io::Error> {
+        Ok(Bytes::from(String::from_utf8_lossy(bytes).to_string()))
     }
 }
 
 #[async_trait::async_trait]
-impl<T: Frame + Sync, FS: FrameSerializer<T>> StreamDestination for FileDestination<T, FS> {
-    type Frame = T;
+impl StreamDestination for FileDestination {
     type Error = std::io::Error;
 
-    async fn provide(&mut self, routing_frame: &Self::Frame) -> Result<(), Self::Error> {
-        let ts = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap_or_default();
-        write!(self.writer, "--- {}.{:06} {} ---\n",
-            ts.as_secs(), ts.subsec_micros(),
-            String::from_utf8_lossy(routing_frame.as_bytes()),
-        )
-    }
-
-    async fn write(&mut self, frame: Self::Frame) -> Result<(), Self::Error> {
-        let bytes: Bytes = self.serializer.serialize(&frame)?.into();
-        self.writer.write_all(bytes.as_ref())?;
+    async fn write(&mut self, bytes: Bytes) -> Result<(), Self::Error> {
+        let serialized = self.serializer.serialize(&bytes)?;
+        self.writer.write_all(serialized.as_ref())?;
         self.writer.write_all(b"\n")
-    }
-
-    async fn write_raw(&mut self, bytes: Bytes) -> Result<(), Self::Error> {
-        self.writer.write_all(&bytes)
     }
 
     async fn relay_response<W: AsyncWrite + Send + Unpin>(&mut self, _client: &mut W) -> Result<u64, Self::Error> {

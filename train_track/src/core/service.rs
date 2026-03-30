@@ -1,9 +1,11 @@
 use std::pin::pin;
 use std::sync::Arc;
 use std::time::Instant;
+use bytes::Bytes;
 use tokio_stream::StreamExt;
 use tracing::warn;
 use crate::io::destination::StreamDestination;
+use crate::io::router::DestinationRouter;
 use crate::atom::frame::{Frame, ParsedData};
 use crate::atom::parser::FrameParser;
 use crate::core::pipeline::FramePipeline;
@@ -120,34 +122,36 @@ struct ConnectionResult {
     request_bytes: u64,
 }
 
-pub struct Pipeline<Src, Par, Pip, Dst>
+pub struct Pipeline<Src, Par, Pip, Rtr>
 where
     Src: StreamSource,
     Par: FrameParser<Src::ReadHalf>,
     Pip: FramePipeline<Frame = Par::Frame>,
-    Dst: StreamDestination<Frame = Par::Frame>,
+    Rtr: DestinationRouter,
 {
     pub source: Src,
     pub parser_factory: fn() -> Par,
     pub pipeline: Arc<Pip>,
-    pub destination_factory: fn() -> Dst,
+    pub router: Arc<Rtr>,
     #[cfg(feature = "metrics-full")]
     pub sampler: Option<Arc<SamplerHandle>>,
 }
 
-impl<Src, Par, Pip, Dst> Pipeline<Src, Par, Pip, Dst>
+impl<Src, Par, Pip, Rtr> Pipeline<Src, Par, Pip, Rtr>
 where
     Src: StreamSource + Sync,
     Par: FrameParser<Src::ReadHalf> + 'static,
     Pip: FramePipeline<Frame = Par::Frame> + 'static,
-    Dst: StreamDestination<Frame = Par::Frame> + 'static,
+    Rtr: DestinationRouter + 'static,
+    Rtr::Destination: 'static,
+    <Rtr::Destination as StreamDestination>::Error: Send,
 {
     async fn handle_connection(
         read_half: Src::ReadHalf,
         mut write_half: Src::WriteHalf,
         parser_factory: fn() -> Par,
         pipeline: Arc<Pip>,
-        destination_factory: fn() -> Dst,
+        router: Arc<Rtr>,
         otel: Arc<OtelMetrics>,
         #[cfg(feature = "metrics-full")] sampler: Option<Arc<SamplerHandle>>,
         #[cfg(feature = "metrics-full")] start_time: Instant,
@@ -160,7 +164,7 @@ where
 
         let conn_start = Instant::now();
         let result = Self::do_connection(
-            read_half, &mut write_half, parser_factory, pipeline, destination_factory, &otel,
+            read_half, &mut write_half, parser_factory, pipeline, router, &otel,
         ).await;
 
         let total_duration = conn_start.elapsed().as_secs_f64();
@@ -214,45 +218,87 @@ where
         write_half: &mut Src::WriteHalf,
         parser_factory: fn() -> Par,
         pipeline: Arc<Pip>,
-        destination_factory: fn() -> Dst,
+        router: Arc<Rtr>,
         otel: &OtelMetrics,
     ) -> Result<ConnectionResult, RailscaleError> {
         let forward_start = Instant::now();
         let mut parser = parser_factory();
-        let mut dest = destination_factory();
         let frames = parser.parse(read_half);
         let mut frames = pin!(frames);
-        let mut routed = false;
         let mut frame_count: u64 = 0;
         let mut passthrough_bytes: u64 = 0;
         let mut request_bytes: u64 = 0;
-        let mut connect_duration: f64 = 0.0;
+
+        let mut pre_route_buf: Vec<Bytes> = Vec::new();
+        let mut routing_key: Option<Bytes> = None;
 
         while let Some(result) = frames.next().await {
             match result {
                 Ok(ParsedData::Passthrough(bytes)) => {
                     passthrough_bytes += bytes.len() as u64;
                     request_bytes += bytes.len() as u64;
-                    dest.write_raw(bytes).await.map_err(Into::into)?;
+                    pre_route_buf.push(bytes);
                 }
                 Ok(ParsedData::Parsed(frame)) => {
                     frame_count += 1;
                     request_bytes += frame.as_bytes().len() as u64;
-                    if frame.is_routing_frame() && !routed {
-                        let connect_start = Instant::now();
-                        dest.provide(&frame).await.map_err(Into::into)?;
-                        connect_duration = connect_start.elapsed().as_secs_f64();
-                        otel.upstream_connected(connect_duration);
-                        routed = true;
+                    let key = frame.routing_key().map(Bytes::copy_from_slice);
+                    let processed = pipeline.process(frame);
+                    pre_route_buf.push(processed.into_bytes());
+                    if let Some(k) = key {
+                        routing_key = Some(k);
+                        break;
                     }
-                    let frame = pipeline.process(frame);
-                    dest.write(frame).await.map_err(Into::into)?;
                 }
                 Err(e) => {
                     warn!(error = %e.into(), "frame parse error");
                     return Err(RailscaleError::ConnectionClosed);
                 }
             }
+        }
+
+        let routing_key = routing_key.ok_or(RailscaleError::NoRoutingFrame)?;
+
+        let connect_start = Instant::now();
+
+        let (dest_result, post_route_buf) = tokio::join!(
+            router.route(&routing_key),
+            async {
+                let mut buf: Vec<Bytes> = Vec::new();
+                while let Some(result) = frames.next().await {
+                    match result {
+                        Ok(ParsedData::Passthrough(bytes)) => {
+                            passthrough_bytes += bytes.len() as u64;
+                            request_bytes += bytes.len() as u64;
+                            buf.push(bytes);
+                        }
+                        Ok(ParsedData::Parsed(frame)) => {
+                            frame_count += 1;
+                            request_bytes += frame.as_bytes().len() as u64;
+                            let processed = pipeline.process(frame);
+                            buf.push(processed.into_bytes());
+                        }
+                        Err(e) => {
+                            warn!(error = %e.into(), "frame parse error");
+                            break;
+                        }
+                    }
+                }
+                buf
+            }
+        );
+
+        let connect_duration = connect_start.elapsed().as_secs_f64();
+        otel.upstream_connected(connect_duration);
+
+        let mut dest = dest_result?;
+
+        for chunk in pre_route_buf {
+            dest.write(chunk).await.map_err(Into::into)?;
+        }
+
+        for chunk in post_route_buf {
+            dest.write(chunk).await.map_err(Into::into)?;
         }
 
         let forward_duration = forward_start.elapsed().as_secs_f64();
@@ -274,7 +320,7 @@ where
     }
 }
 
-impl<Src, Par, Pip, Dst> Service for Pipeline<Src, Par, Pip, Dst>
+impl<Src, Par, Pip, Rtr> Service for Pipeline<Src, Par, Pip, Rtr>
 where
     Src: StreamSource + Sync + 'static,
     Src::ReadHalf: Send + 'static,
@@ -282,7 +328,9 @@ where
     Par: FrameParser<Src::ReadHalf> + 'static,
     Par::Error: Send,
     Pip: FramePipeline<Frame = Par::Frame> + 'static,
-    Dst: StreamDestination<Frame = Par::Frame> + 'static,
+    Rtr: DestinationRouter + 'static,
+    Rtr::Destination: 'static,
+    <Rtr::Destination as StreamDestination>::Error: Send,
 {
     async fn run(&self) -> Result<(), RailscaleError> {
         let otel = Arc::new(OtelMetrics::new());
@@ -294,14 +342,14 @@ where
         loop {
             let (read_half, write_half) = self.source.accept().await.map_err(Into::into)?;
             let parser_factory = self.parser_factory;
-            let destination_factory = self.destination_factory;
+            let router = Arc::clone(&self.router);
             let pipeline = Arc::clone(&self.pipeline);
             let otel = Arc::clone(&otel);
             #[cfg(feature = "metrics-full")]
             let sampler = sampler.clone();
 
             tokio::spawn(Self::handle_connection(
-                read_half, write_half, parser_factory, pipeline, destination_factory,
+                read_half, write_half, parser_factory, pipeline, router,
                 otel,
                 #[cfg(feature = "metrics-full")] sampler,
                 #[cfg(feature = "metrics-full")] start_time,

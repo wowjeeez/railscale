@@ -30,7 +30,7 @@ impl Frame for HttpFrame {
         self.data
     }
 
-    fn is_routing_frame(&self) -> bool {
-        self.routing
+    fn routing_key(&self) -> Option<&[u8]> {
+        if self.routing { Some(&self.data) } else { None }
     }
 }

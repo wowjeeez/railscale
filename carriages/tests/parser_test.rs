@@ -3,7 +3,7 @@ use std::pin::pin;
 use tokio::io::AsyncWriteExt;
 use tokio_stream::StreamExt;
 use train_track::{Frame, FrameParser, ParsedData};
-use locomotive::HttpParser;
+use carriages::HttpParser;
 use memchr::memmem::Finder;
 
 #[tokio::test]
@@ -25,7 +25,7 @@ async fn parses_http_request_into_frames_and_passthrough() {
     while let Some(Ok(item)) = stream.next().await {
         match item {
             ParsedData::Parsed(frame) => {
-                if frame.is_routing_frame() {
+                if frame.routing_key().is_some() {
                     had_routing = true;
                 }
                 items.push(String::from_utf8_lossy(frame.as_bytes()).into_owned());
@@ -37,8 +37,8 @@ async fn parses_http_request_into_frames_and_passthrough() {
     }
 
     assert!(had_routing);
-    assert_eq!(items[0], "GET / HTTP/1.1");
-    assert_eq!(items[1], "Host: example.com");
+    assert_eq!(items[0], "GET / HTTP/1.1\r\n");
+    assert_eq!(items[1], "Host: example.com\r\n");
     assert!(passthrough_bytes > 0);
 }
 
@@ -67,5 +67,5 @@ async fn applies_matchers_during_parse() {
         }
     }
 
-    assert_eq!(headers[1], "Host: replaced.com");
+    assert_eq!(headers[1], "Host: replaced.com\r\n");
 }

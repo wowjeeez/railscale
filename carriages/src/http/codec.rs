@@ -63,19 +63,19 @@ impl Decoder for HttpStreamingCodec {
                 let is_request_line = self.first_line;
                 self.first_line = false;
 
-                let line = src.split_to(pos);
-                src.advance(2);
+                let line = src.split_to(pos + 2).freeze();
 
                 if is_request_line {
-                    return Ok(Some(HttpFrame::header(line.freeze(), true)));
+                    return Ok(Some(HttpFrame::header(line, true)));
                 }
 
+                let header = &line[..line.len() - 2];
                 let replaced = self.matchers.par_iter().find_map_first(|(matcher, value)| {
-                    let idx = matcher.find(&line);
-                    let sep = memchr::memchr(b':', &line);
+                    let idx = matcher.find(header);
+                    let sep = memchr::memchr(b':', header);
                     if idx.is_some() && sep.is_some() {
-                        let (name, _) = line.split_at(sep.unwrap());
-                        Some(Bytes::from([name, b": ", value].concat()))
+                        let (name, _) = header.split_at(sep.unwrap());
+                        Some(Bytes::from([name, b": ", value, b"\r\n"].concat()))
                     } else {
                         None
                     }
@@ -83,7 +83,7 @@ impl Decoder for HttpStreamingCodec {
 
                 match replaced {
                     Some(bytes) => Ok(Some(HttpFrame::header(bytes, false))),
-                    None => Ok(Some(HttpFrame::header(line.freeze(), false))),
+                    None => Ok(Some(HttpFrame::header(line, false))),
                 }
             }
             None => Ok(None),

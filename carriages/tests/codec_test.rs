@@ -1,6 +1,6 @@
 use bytes::BytesMut;
 use tokio_util::codec::Decoder;
-use locomotive::{HttpStreamingCodec, HttpFrame};
+use carriages::{HttpStreamingCodec, HttpFrame};
 use train_track::Frame;
 
 #[test]
@@ -8,8 +8,8 @@ fn decodes_request_line() {
     let mut codec = HttpStreamingCodec::new(vec![]);
     let mut buf = BytesMut::from("GET / HTTP/1.1\r\n");
     let frame = codec.decode(&mut buf).unwrap().unwrap();
-    assert!(frame.is_routing_frame());
-    assert_eq!(frame.as_bytes(), b"GET / HTTP/1.1");
+    assert!(frame.routing_key().is_some());
+    assert_eq!(frame.as_bytes(), b"GET / HTTP/1.1\r\n");
 }
 
 #[test]
@@ -18,8 +18,8 @@ fn decodes_header_line() {
     let mut buf = BytesMut::from("GET /\r\nHost: example.com\r\n");
     let _ = codec.decode(&mut buf).unwrap();
     let frame = codec.decode(&mut buf).unwrap().unwrap();
-    assert!(!frame.is_routing_frame());
-    assert_eq!(frame.as_bytes(), b"Host: example.com");
+    assert!(frame.routing_key().is_none());
+    assert_eq!(frame.as_bytes(), b"Host: example.com\r\n");
 }
 
 #[test]
@@ -43,7 +43,7 @@ fn applies_matcher_replacement() {
     let mut buf = BytesMut::from("GET /\r\nHost: example.com\r\n");
     let _ = codec.decode(&mut buf).unwrap();
     let frame = codec.decode(&mut buf).unwrap().unwrap();
-    assert_eq!(frame.as_bytes(), b"Host: rewritten.local");
+    assert_eq!(frame.as_bytes(), b"Host: rewritten.local\r\n");
 }
 
 #[test]

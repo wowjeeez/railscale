@@ -1,10 +1,11 @@
 use bytes::Bytes;
 use tokio::io::AsyncReadExt;
-use train_track::{Frame, StreamDestination};
-use locomotive::{HttpFrame, TcpDestination};
+use tokio::net::TcpStream;
+use train_track::StreamDestination;
+use carriages::TcpDestination;
 
 #[tokio::test]
-async fn provides_and_writes_to_upstream() {
+async fn writes_to_upstream() {
     let upstream = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = upstream.local_addr().unwrap();
 
@@ -15,15 +16,11 @@ async fn provides_and_writes_to_upstream() {
         buf
     });
 
-    let mut dest = TcpDestination::new();
-    let routing = HttpFrame::header(
-        Bytes::from(format!("GET / HTTP/1.1\r\nUpstream: {addr}")),
-        true,
-    );
-    dest.provide_with_addr(&addr).await.unwrap();
-    dest.write(routing).await.unwrap();
-    dest.write(HttpFrame::header(Bytes::from_static(b"Host: test\r\n"), false)).await.unwrap();
-    dest.write_raw(Bytes::from_static(b"body")).await.unwrap();
+    let stream = TcpStream::connect(addr).await.unwrap();
+    let mut dest = TcpDestination::new(stream);
+    dest.write(Bytes::from_static(b"GET / HTTP/1.1\r\n")).await.unwrap();
+    dest.write(Bytes::from_static(b"Host: test\r\n")).await.unwrap();
+    dest.write(Bytes::from_static(b"body")).await.unwrap();
     drop(dest);
 
     let received = join.await.unwrap();

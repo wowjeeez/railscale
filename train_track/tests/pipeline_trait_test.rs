@@ -6,7 +6,7 @@ struct TestFrame(Bytes);
 impl Frame for TestFrame {
     fn as_bytes(&self) -> &[u8] { &self.0 }
     fn into_bytes(self) -> Bytes { self.0 }
-    fn is_routing_frame(&self) -> bool { false }
+    fn routing_key(&self) -> Option<&[u8]> { None }
 }
 
 struct UppercasePipeline;

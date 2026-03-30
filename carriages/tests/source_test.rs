@@ -1,6 +1,6 @@
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
-use locomotive::TcpSource;
+use carriages::TcpSource;
 use train_track::StreamSource;
 
 #[tokio::test]
@@ -17,8 +17,8 @@ async fn tcp_source_accepts_connection() {
     client.write_all(b"hello").await.unwrap();
     client.shutdown().await.unwrap();
 
-    let mut server_stream = join.await.unwrap();
+    let (mut read_half, _write_half) = join.await.unwrap();
     let mut buf = vec![0u8; 5];
-    server_stream.read_exact(&mut buf).await.unwrap();
+    read_half.read_exact(&mut buf).await.unwrap();
     assert_eq!(&buf, b"hello");
 }

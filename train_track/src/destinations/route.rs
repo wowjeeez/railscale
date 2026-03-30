@@ -1,14 +1,9 @@
-use std::marker::PhantomData;
-use bytes::Bytes;
+use std::future::Future;
+use std::pin::Pin;
 use memchr::memmem;
-use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
-use tokio::io::AsyncWrite;
-use crate::{Frame, RailscaleError, StreamDestination};
-
-pub trait DomainMatcher<T: StreamDestination>: Send + Sync {
-    fn matches(&self, domain: &[u8]) -> bool;
-    fn get_destination(&self) -> T;
-}
+use crate::io::destination::StreamDestination;
+use crate::io::router::DestinationRouter;
+use crate::RailscaleError;
 
 pub enum MatchStrategy {
     Exact(Vec<u8>),
@@ -50,69 +45,34 @@ impl MatchStrategy {
     }
 }
 
-pub struct MemchrDomainMatcher<D: StreamDestination> {
-    strategy: MatchStrategy,
-    destination_factory: Box<dyn Fn() -> D + Send + Sync>,
+type RouteFactory<D> = Box<dyn Fn(&[u8]) -> Pin<Box<dyn Future<Output = Result<D, RailscaleError>> + Send>> + Send + Sync>;
+
+pub struct MatchingRouter<D: StreamDestination> {
+    matchers: Vec<(MatchStrategy, RouteFactory<D>)>,
 }
 
-impl<D: StreamDestination> MemchrDomainMatcher<D> {
-    pub fn new(strategy: MatchStrategy, factory: impl Fn() -> D + Send + Sync + 'static) -> Self {
-        Self { strategy, destination_factory: Box::new(factory) }
-    }
-}
-
-impl<D: StreamDestination> DomainMatcher<D> for MemchrDomainMatcher<D> {
-    fn matches(&self, domain: &[u8]) -> bool {
-        self.strategy.is_match(domain)
+impl<D: StreamDestination> MatchingRouter<D> {
+    pub fn new() -> Self {
+        Self { matchers: Vec::new() }
     }
 
-    fn get_destination(&self) -> D {
-        (self.destination_factory)()
-    }
-}
-
-pub struct RouterDestination<T: Frame, R: StreamDestination<Frame=T>, M: DomainMatcher<R>> {
-    target: Option<R>,
-    _t: PhantomData<T>,
-    matchers: Vec<M>,
-}
-
-impl<T: Frame, R: StreamDestination<Frame=T>, M: DomainMatcher<R>> RouterDestination<T, R, M> {
-    pub fn new(matchers: Vec<M>) -> Self {
-        Self { target: None, _t: PhantomData, matchers }
+    pub fn add_route(mut self, strategy: MatchStrategy, factory: RouteFactory<D>) -> Self {
+        self.matchers.push((strategy, factory));
+        self
     }
 }
 
 #[async_trait::async_trait]
-impl<T: Frame + Sync, D: StreamDestination<Frame=T>, M: DomainMatcher<D>> StreamDestination for RouterDestination<T, D, M> {
-    type Frame = T;
-    type Error = RailscaleError;
+impl<D: StreamDestination + 'static> DestinationRouter for MatchingRouter<D> {
+    type Destination = D;
 
-    async fn provide(&mut self, routing_frame: &Self::Frame) -> Result<(), Self::Error> {
-        let route = self.matchers.par_iter().find_map_first(|x| {
-            if x.matches(&routing_frame.as_bytes()) {
-                Some(x.get_destination())
-            } else {
-                None
+    async fn route(&self, routing_key: &[u8]) -> Result<Self::Destination, RailscaleError> {
+        for (strategy, factory) in &self.matchers {
+            if strategy.is_match(routing_key) {
+                return factory(routing_key).await;
             }
-        });
-        self.target = route;
-        Ok(())
-    }
-
-    async fn write(&mut self, frame: Self::Frame) -> Result<(), Self::Error> {
-        let Some(ref mut target) = self.target else { Err(Self::Error::RoutingFailed("no route".into()))? };
-        target.write(frame).await.map_err(Into::into)
-    }
-
-    async fn write_raw(&mut self, bytes: Bytes) -> Result<(), Self::Error> {
-        let Some(ref mut target) = self.target else { Err(Self::Error::RoutingFailed("no route".into()))? };
-        target.write_raw(bytes).await.map_err(Into::into)
-    }
-
-    async fn relay_response<W: AsyncWrite + Send + Unpin>(&mut self, client: &mut W) -> Result<u64, Self::Error> {
-        let Some(ref mut target) = self.target else { Err(Self::Error::RoutingFailed("no route".into()))? };
-        target.relay_response::<W>(client).await.map_err(Into::into)
+        }
+        Err(RailscaleError::RoutingFailed("no matching route".into()))
     }
 }
 

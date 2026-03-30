@@ -1,57 +1,38 @@
 use bytes::Bytes;
-use train_track::{Frame, StreamDestination, RailscaleError};
-
-struct TestFrame(Bytes);
-
-impl Frame for TestFrame {
-    fn as_bytes(&self) -> &[u8] { &self.0 }
-    fn into_bytes(self) -> Bytes { self.0 }
-    fn is_routing_frame(&self) -> bool { false }
-}
+use train_track::{StreamDestination, RailscaleError};
 
 struct CollectDestination {
-    frames: Vec<Vec<u8>>,
-    raw: Vec<Vec<u8>>,
-    routed: bool,
+    chunks: Vec<Bytes>,
 }
 
 impl CollectDestination {
     fn new() -> Self {
-        Self { frames: vec![], raw: vec![], routed: false }
+        Self { chunks: vec![] }
     }
 }
 
+#[async_trait::async_trait]
 impl StreamDestination for CollectDestination {
-    type Frame = TestFrame;
     type Error = std::io::Error;
 
-    async fn provide(&mut self, routing_frame: &Self::Frame) -> Result<(), Self::Error> {
-        self.routed = true;
+    async fn write(&mut self, bytes: Bytes) -> Result<(), Self::Error> {
+        self.chunks.push(bytes);
         Ok(())
     }
 
-    async fn write(&mut self, frame: Self::Frame) -> Result<(), Self::Error> {
-        self.frames.push(frame.as_bytes().to_vec());
-        Ok(())
-    }
-
-    async fn write_raw(&mut self, bytes: Bytes) -> Result<(), Self::Error> {
-        self.raw.push(bytes.to_vec());
-        Ok(())
+    async fn relay_response<W: tokio::io::AsyncWrite + Send + Unpin>(&mut self, _client: &mut W) -> Result<u64, Self::Error> {
+        Ok(0)
     }
 }
 
 #[tokio::test]
-async fn destination_provide_then_write() {
+async fn destination_write_collects_bytes() {
     let mut dest = CollectDestination::new();
-    let routing = TestFrame(Bytes::from_static(b"GET / HTTP/1.1"));
-    dest.provide(&routing).await.unwrap();
-    assert!(dest.routed);
 
-    dest.write(TestFrame(Bytes::from_static(b"Host: example.com"))).await.unwrap();
-    dest.write_raw(Bytes::from_static(b"body data")).await.unwrap();
+    dest.write(Bytes::from_static(b"hello")).await.unwrap();
+    dest.write(Bytes::from_static(b"world")).await.unwrap();
 
-    assert_eq!(dest.frames.len(), 1);
-    assert_eq!(dest.raw.len(), 1);
-    assert_eq!(dest.raw[0], b"body data");
+    assert_eq!(dest.chunks.len(), 2);
+    assert_eq!(&dest.chunks[0][..], b"hello");
+    assert_eq!(&dest.chunks[1][..], b"world");
 }

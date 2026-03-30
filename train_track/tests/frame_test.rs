@@ -15,8 +15,8 @@ impl Frame for TestFrame {
         self.data
     }
 
-    fn is_routing_frame(&self) -> bool {
-        self.routing
+    fn routing_key(&self) -> Option<&[u8]> {
+        if self.routing { Some(&self.data) } else { None }
     }
 }
 
@@ -24,13 +24,13 @@ impl Frame for TestFrame {
 fn frame_as_bytes() {
     let f = TestFrame { data: Bytes::from_static(b"GET / HTTP/1.1"), routing: true };
     assert_eq!(f.as_bytes(), b"GET / HTTP/1.1");
-    assert!(f.is_routing_frame());
+    assert!(f.routing_key().is_some());
 }
 
 #[test]
 fn frame_into_bytes() {
     let f = TestFrame { data: Bytes::from_static(b"hello"), routing: false };
-    assert!(!f.is_routing_frame());
+    assert!(f.routing_key().is_none());
     let b = f.into_bytes();
     assert_eq!(&b[..], b"hello");
 }
