@@ -86,8 +86,10 @@ name = "conductor"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "carriages",
  "memchr",
- "rayon",
+ "tokio",
+ "tracing",
  "train_track",
 ]
 

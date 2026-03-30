@@ -9,9 +9,9 @@ fn first_match_wins() {
         (Finder::new(b"Host"), Bytes::from_static(b"first.com")),
         (Finder::new(b"Host"), Bytes::from_static(b"second.com")),
     ]);
-    let frame = HttpFrame::header(Bytes::from_static(b"Host: original.com"), false);
+    let frame = HttpFrame::header(Bytes::from_static(b"Host: original.com\r\n"), false);
     let result = pipeline.process(frame);
-    assert_eq!(result.as_bytes(), b"Host: first.com");
+    assert_eq!(result.as_bytes(), b"Host: first.com\r\n");
 }
 
 #[test]
@@ -19,17 +19,17 @@ fn no_match_passes_through() {
     let pipeline = HttpPipeline::new(vec![
         (Finder::new(b"Host"), Bytes::from_static(b"replaced.com")),
     ]);
-    let frame = HttpFrame::header(Bytes::from_static(b"Content-Type: text/html"), false);
+    let frame = HttpFrame::header(Bytes::from_static(b"Content-Type: text/html\r\n"), false);
     let result = pipeline.process(frame);
-    assert_eq!(result.as_bytes(), b"Content-Type: text/html");
+    assert_eq!(result.as_bytes(), b"Content-Type: text/html\r\n");
 }
 
 #[test]
 fn empty_matchers_passes_through() {
     let pipeline = HttpPipeline::new(vec![]);
-    let frame = HttpFrame::header(Bytes::from_static(b"Host: example.com"), false);
+    let frame = HttpFrame::header(Bytes::from_static(b"Host: example.com\r\n"), false);
     let result = pipeline.process(frame);
-    assert_eq!(result.as_bytes(), b"Host: example.com");
+    assert_eq!(result.as_bytes(), b"Host: example.com\r\n");
 }
 
 #[test]

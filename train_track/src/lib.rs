@@ -1,6 +1,6 @@
 mod error;
 #[cfg(feature = "metrics-full")]
-pub mod sampler;
+pub mod recorder;
 mod io;
 mod atom;
 mod core;
@@ -15,4 +15,4 @@ pub use core::service::{Pipeline, Service};
 pub use io::router::DestinationRouter;
 pub use io::source::StreamSource;
 pub use destinations::route::{MatchStrategy, MatchingRouter};
-pub use destinations::file::{FileDestination, FrameSerializer, DefaultFrameSerializer};
+pub use destinations::file::FileDestination;

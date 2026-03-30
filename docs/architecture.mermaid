@@ -1,19 +1,3 @@
-<p align="center">
-  <img src="logo.png" alt="Railscale" width="200">
-</p>
-
-# Railscale
-Insanely fast (really) streaming proxy/dns/packet capture/maybe even firewall service.
-For now it supports http header remapping and routing.
-
-# Architecture
-Railscale is very complex compared to what one would expect from a proxy. The reason being is that railscale doesnt buffer requests in memory, and is tuned for maximum performance.
-The architecture is also designed to be extensible for basically any protocol. 
-The mental model i had while writing is:
-- mental model chart here todo sadly claude cant generate that 
-
-#### Implementation
-```mermaid
 flowchart LR
     subgraph source["StreamSource"]
         direction TB
@@ -35,11 +19,13 @@ flowchart LR
 
     subgraph concurrent["Concurrent Fork"]
         direction TB
+
         subgraph routing["DestinationRouter"]
             rk["routing_key()\n(Host / Request Line)"]
             route["route() -> TcpStream\n(async TCP connect)"]
             rk --> route
         end
+
         subgraph pipeline["FramePipeline (rayon)"]
             direction TB
             m1["Matcher 1"]
@@ -69,4 +55,25 @@ flowchart LR
     route --> dest
     relay -.-> wh
 
-```
+    style source fill:#1a1a2e,stroke:#e94560,color:#fff
+    style parsing fill:#16213e,stroke:#0f3460,color:#fff
+    style concurrent fill:#0f3460,stroke:#533483,color:#fff
+    style routing fill:#1a1a2e,stroke:#e94560,color:#fff
+    style pipeline fill:#1a1a2e,stroke:#f5a623,color:#fff
+    style dest fill:#16213e,stroke:#00b4d8,color:#fff
+
+    style tcp fill:#e94560,stroke:#e94560,color:#fff
+    style rh fill:#e94560,stroke:#e94560,color:#fff
+    style wh fill:#e94560,stroke:#e94560,color:#fff
+    style codec fill:#0f3460,stroke:#0f3460,color:#fff
+    style parsed fill:#533483,stroke:#533483,color:#fff
+    style pass fill:#f5a623,stroke:#f5a623,color:#000
+    style rk fill:#00b4d8,stroke:#00b4d8,color:#fff
+    style route fill:#00b4d8,stroke:#00b4d8,color:#fff
+    style m1 fill:#f5a623,stroke:#f5a623,color:#000
+    style m2 fill:#f5a623,stroke:#f5a623,color:#000
+    style m3 fill:#f5a623,stroke:#f5a623,color:#000
+    style rewrite fill:#533483,stroke:#533483,color:#fff
+    style write fill:#00b4d8,stroke:#00b4d8,color:#fff
+    style passw fill:#f5a623,stroke:#f5a623,color:#000
+    style relay fill:#e94560,stroke:#e94560,color:#fff

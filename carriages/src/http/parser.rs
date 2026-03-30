@@ -58,10 +58,16 @@ impl<T: AsyncRead + Unpin> Stream for HttpFrameStream<T> {
             Poll::Ready(Some(Ok(frame))) => {
                 if frame.is_end_of_headers() {
                     *this.headers_done = true;
-                    return match drain_buffer(inner) {
-                        Some(data) => Poll::Ready(Some(Ok(data))),
-                        None => Poll::Ready(None),
-                    };
+                    let separator = Bytes::from_static(b"\r\n");
+                    let buf = inner.read_buffer_mut();
+                    if buf.is_empty() {
+                        return Poll::Ready(Some(Ok(ParsedData::Passthrough(separator))));
+                    }
+                    let body = buf.split().freeze();
+                    let mut combined = bytes::BytesMut::with_capacity(2 + body.len());
+                    combined.extend_from_slice(&separator);
+                    combined.extend_from_slice(&body);
+                    return Poll::Ready(Some(Ok(ParsedData::Passthrough(combined.freeze()))));
                 }
                 Poll::Ready(Some(Ok(ParsedData::Parsed(frame))))
             }

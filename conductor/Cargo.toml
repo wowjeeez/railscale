@@ -4,7 +4,16 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-train_track = {path = "../train_track"}
-memchr = {workspace = true}
-bytes = {workspace = true}
-rayon = {workspace = true}
+carriages = { path = "../carriages" }
+train_track = { path = "../train_track" }
+bytes = { workspace = true }
+memchr = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+
+[features]
+default = ["metrics-minimal"]
+metrics-minimal = ["carriages/metrics-minimal"]
+metrics-full = ["carriages/metrics-full"]
+metrics-erased = ["carriages/metrics-erased"]
+log-raw = ["carriages/log-raw"]

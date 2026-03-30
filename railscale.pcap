@@ -1,0 +1,5 @@
+GET /_ping HTTP/1.1
+Host: alpiq-machone-subnet.taild4189d.ts.net:8080
+User-Agent: curl/8.7.1
+Accept: */*
+

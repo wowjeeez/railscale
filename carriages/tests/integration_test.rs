@@ -38,7 +38,7 @@ async fn full_http_pipeline_end_to_end() {
             pipeline: pipeline_proc,
             router,
             #[cfg(feature = "metrics-full")]
-            sampler: None,
+            recorder: None,
         };
 
         pipeline.run().await

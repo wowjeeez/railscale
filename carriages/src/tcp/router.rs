@@ -1,6 +1,7 @@
-use tokio::net::TcpStream;
+use tokio::net::{TcpStream, UnixStream};
 use train_track::{DestinationRouter, RailscaleError};
 use crate::TcpDestination;
+use crate::tcp::destination::TcpOverSockDestination;
 
 pub struct TcpRouter {
     fixed_addr: Option<String>,
@@ -46,5 +47,25 @@ impl DestinationRouter for TcpRouter {
         };
         let stream = TcpStream::connect(&host).await?;
         Ok(TcpDestination::new(stream))
+    }
+}
+
+pub struct TcpOverSockRouter {
+    path: String,
+}
+
+impl TcpOverSockRouter {
+    pub fn new(path: impl Into<String>) -> Self {
+        Self { path: path.into() }
+    }
+}
+
+#[async_trait::async_trait]
+impl DestinationRouter for TcpOverSockRouter {
+    type Destination = TcpOverSockDestination;
+
+    async fn route(&self, _routing_key: &[u8]) -> Result<Self::Destination, RailscaleError> {
+        let stream = UnixStream::connect(&self.path).await?;
+        Ok(TcpOverSockDestination::new(stream))
     }
 }

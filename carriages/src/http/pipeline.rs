@@ -28,7 +28,7 @@ impl FramePipeline for HttpPipeline {
             let sep = memchr::memchr(b':', line);
             if idx.is_some() && sep.is_some() {
                 let (name, _) = line.split_at(sep.unwrap());
-                Some(Bytes::from([name, b": ", &value[..]].concat()))
+                Some(Bytes::from([name, b": ", &value[..], b"\r\n"].concat()))
             } else {
                 None
             }
