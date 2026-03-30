@@ -35,10 +35,11 @@ The architecture is also designed to be extensible for basically any network rel
   <img src="chaotic.png" alt="Chatoic">
 </p>
 
-- Bypass firewalls
-- Bypass strict corporate network policies
+- Bypass firewalls & ISP/gov restrictions
+- Bypass strict corporate network policies & NAT
 - Rotate proxies
 - Posture spoofing
+- SSH & RDP where they are explicitly forbidden
 - Tor mesh
 - NTLM gateway
 - Interconnect multiple corporate machines conveniently
