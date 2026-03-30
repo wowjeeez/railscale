@@ -26,3 +26,4 @@ Cargo.lock
 # AgentOps session artifacts
 .agents/
 loadtest-results
+proxies/

@@ -13,8 +13,8 @@ opentelemetry = { workspace = true, optional = true }
 sysinfo = { workspace = true, optional = true }
 memmap2 = {workspace = true}
 async-trait = {workspace = true}
-rayon = {workspace = true}
 memchr = {workspace = true}
+tokio-util = { workspace = true }
 
 [features]
 default = ["metrics-minimal"]

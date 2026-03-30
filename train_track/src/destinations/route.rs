@@ -72,7 +72,7 @@ impl<D: StreamDestination + 'static> DestinationRouter for MatchingRouter<D> {
                 return factory(routing_key).await;
             }
         }
-        Err(RailscaleError::RoutingFailed("no matching route".into()))
+        Err(RailscaleError::from(crate::ErrorKind::RoutingFailed("no matching route".into())))
     }
 }
 

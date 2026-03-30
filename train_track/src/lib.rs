@@ -7,7 +7,7 @@ mod core;
 mod destinations;
 
 pub use io::destination::StreamDestination;
-pub use error::RailscaleError;
+pub use error::{RailscaleError, ErrorKind, Phase};
 pub use atom::frame::{Frame, ParsedData};
 pub use atom::parser::FrameParser;
 pub use core::pipeline::FramePipeline;
@@ -16,3 +16,7 @@ pub use io::router::DestinationRouter;
 pub use io::source::StreamSource;
 pub use destinations::route::{MatchStrategy, MatchingRouter};
 pub use destinations::file::FileDestination;
+pub use core::error_mapper::{ErrorToFrames, ErrorToBytes};
+pub use core::service::BufferLimits;
+pub use io::batcher::BatchWriter;
+pub use tokio_util::sync::CancellationToken;

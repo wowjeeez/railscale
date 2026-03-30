@@ -24,14 +24,11 @@ impl FramePipeline for HttpPipeline {
 
         let line = frame.as_bytes();
         let replaced = self.matchers.par_iter().find_map_first(|(matcher, value)| {
-            let idx = matcher.find(line);
-            let sep = memchr::memchr(b':', line);
-            if idx.is_some() && sep.is_some() {
-                let (name, _) = line.split_at(sep.unwrap());
-                Some(Bytes::from([name, b": ", &value[..], b"\r\n"].concat()))
-            } else {
-                None
-            }
+            let sep = memchr::memchr(b':', line)?;
+            let name = &line[..sep];
+            matcher.find(name).map(|_| {
+                Bytes::from([name, b": ", &value[..], b"\r\n"].concat())
+            })
         });
 
         match replaced {

@@ -2,7 +2,7 @@ use bytes::Bytes;
 use memchr::memmem::Finder;
 use carriages::{HttpParser, HttpPipeline, TcpRouter, SockSource, init_metrics};
 use std::sync::Arc;
-use train_track::{Pipeline, Service};
+use train_track::{CancellationToken, Pipeline, Service};
 
 #[tokio::main]
 async fn main() {
@@ -28,9 +28,12 @@ async fn main() {
             (Finder::new(b"User-Agent"), Bytes::from_static(b"railscale/1.0")),
         ])),
         router: Arc::new(TcpRouter::fixed(&upstream)),
+        error_responder: Some(Arc::new(carriages::HttpErrorResponder)),
+        buffer_limits: Default::default(),
+        drain_timeout: std::time::Duration::from_secs(30),
         #[cfg(feature = "metrics-full")]
         recorder: None,
     };
 
-    pipeline.run().await.unwrap();
+    pipeline.run(CancellationToken::new()).await.unwrap();
 }

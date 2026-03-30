@@ -1,19 +1,26 @@
+use std::time::Duration;
 use tokio::net::{TcpStream, UnixStream};
-use train_track::{DestinationRouter, RailscaleError};
+use train_track::{DestinationRouter, ErrorKind, RailscaleError};
 use crate::TcpDestination;
 use crate::tcp::destination::TcpOverSockDestination;
 
 pub struct TcpRouter {
     fixed_addr: Option<String>,
+    inactivity_timeout: Option<Duration>,
 }
 
 impl TcpRouter {
     pub fn fixed(addr: impl Into<String>) -> Self {
-        Self { fixed_addr: Some(addr.into()) }
+        Self { fixed_addr: Some(addr.into()), inactivity_timeout: None }
     }
 
     pub fn from_routing_key() -> Self {
-        Self { fixed_addr: None }
+        Self { fixed_addr: None, inactivity_timeout: None }
+    }
+
+    pub fn with_inactivity_timeout(mut self, d: Duration) -> Self {
+        self.inactivity_timeout = Some(d);
+        self
     }
 }
 
@@ -42,21 +49,31 @@ impl DestinationRouter for TcpRouter {
         let host = match &self.fixed_addr {
             Some(addr) => addr.clone(),
             None => extract_host(routing_key).ok_or_else(|| {
-                RailscaleError::RoutingFailed("no host in routing key".into())
+                RailscaleError::from(ErrorKind::RoutingFailed("no host in routing key".into()))
             })?,
         };
         let stream = TcpStream::connect(&host).await?;
-        Ok(TcpDestination::new(stream))
+        let dest = TcpDestination::new(stream);
+        match self.inactivity_timeout {
+            Some(d) => Ok(dest.with_timeout(d)),
+            None => Ok(dest),
+        }
     }
 }
 
 pub struct TcpOverSockRouter {
     path: String,
+    inactivity_timeout: Option<Duration>,
 }
 
 impl TcpOverSockRouter {
     pub fn new(path: impl Into<String>) -> Self {
-        Self { path: path.into() }
+        Self { path: path.into(), inactivity_timeout: None }
+    }
+
+    pub fn with_inactivity_timeout(mut self, d: Duration) -> Self {
+        self.inactivity_timeout = Some(d);
+        self
     }
 }
 
@@ -66,6 +83,10 @@ impl DestinationRouter for TcpOverSockRouter {
 
     async fn route(&self, _routing_key: &[u8]) -> Result<Self::Destination, RailscaleError> {
         let stream = UnixStream::connect(&self.path).await?;
-        Ok(TcpOverSockDestination::new(stream))
+        let dest = TcpOverSockDestination::new(stream);
+        match self.inactivity_timeout {
+            Some(d) => Ok(dest.with_timeout(d)),
+            None => Ok(dest),
+        }
     }
 }

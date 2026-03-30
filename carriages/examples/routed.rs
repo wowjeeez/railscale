@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 use carriages::{HttpParser, HttpPipeline, TcpSource, init_metrics};
-use train_track::{DestinationRouter, FileDestination, Pipeline, RailscaleError, Service};
+use train_track::{CancellationToken, DestinationRouter, FileDestination, Pipeline, RailscaleError, Service};
 
 struct FileRouter;
 
@@ -35,9 +35,12 @@ async fn main() {
         parser_factory: || HttpParser::new(vec![]),
         pipeline: Arc::new(HttpPipeline::new(vec![])),
         router: Arc::new(FileRouter),
+        error_responder: None,
+        buffer_limits: Default::default(),
+        drain_timeout: std::time::Duration::from_secs(30),
         #[cfg(feature = "metrics-full")]
         recorder: None,
     };
 
-    pipeline.run().await.unwrap();
+    pipeline.run(CancellationToken::new()).await.unwrap();
 }

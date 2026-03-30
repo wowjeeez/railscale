@@ -71,14 +71,11 @@ impl Decoder for HttpStreamingCodec {
 
                 let header = &line[..line.len() - 2];
                 let replaced = self.matchers.par_iter().find_map_first(|(matcher, value)| {
-                    let idx = matcher.find(header);
-                    let sep = memchr::memchr(b':', header);
-                    if idx.is_some() && sep.is_some() {
-                        let (name, _) = header.split_at(sep.unwrap());
-                        Some(Bytes::from([name, b": ", value, b"\r\n"].concat()))
-                    } else {
-                        None
-                    }
+                    let sep = memchr::memchr(b':', header)?;
+                    let name = &header[..sep];
+                    matcher.find(name).map(|_| {
+                        Bytes::from([name, b": ", value.as_ref(), b"\r\n"].concat())
+                    })
                 });
 
                 match replaced {

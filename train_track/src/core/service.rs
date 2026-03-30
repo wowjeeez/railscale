@@ -1,8 +1,11 @@
 use std::pin::pin;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use bytes::Bytes;
+use tokio::io::AsyncWriteExt;
+use tokio::task::JoinSet;
 use tokio_stream::StreamExt;
+use tokio_util::sync::CancellationToken;
 use tracing::{info, debug, warn};
 #[cfg(feature = "log-raw")]
 use tracing::trace;
@@ -17,8 +20,10 @@ use crate::io::router::DestinationRouter;
 use crate::atom::frame::{Frame, ParsedData};
 use crate::atom::parser::FrameParser;
 use crate::core::pipeline::FramePipeline;
+use crate::core::error_mapper::ErrorToBytes;
 use crate::io::source::StreamSource;
-use crate::RailscaleError;
+use crate::io::batcher::BatchWriter;
+use crate::{RailscaleError, ErrorKind, Phase};
 
 #[cfg(feature = "metrics-full")]
 use crate::recorder::{RecorderHandle, RequestEntry};
@@ -50,7 +55,7 @@ impl<W: AsyncWrite + Unpin> AsyncWrite for TracingWriter<W> {
 }
 
 pub trait Service: Send + Sync {
-    fn run(&self) -> impl std::future::Future<Output = Result<(), RailscaleError>> + Send;
+    fn run(&self, cancel: CancellationToken) -> impl std::future::Future<Output = Result<(), RailscaleError>> + Send;
 }
 
 #[cfg(feature = "metrics-minimal")]
@@ -166,6 +171,22 @@ mod otel {
 
 use otel::OtelMetrics;
 
+const DEFAULT_MAX_BYTES: usize = 8 * 1024 * 1024;
+
+pub struct BufferLimits {
+    pub max_pre_route_bytes: usize,
+    pub max_post_route_bytes: usize,
+}
+
+impl Default for BufferLimits {
+    fn default() -> Self {
+        Self {
+            max_pre_route_bytes: DEFAULT_MAX_BYTES,
+            max_post_route_bytes: DEFAULT_MAX_BYTES,
+        }
+    }
+}
+
 #[cfg_attr(not(feature = "metrics-full"), allow(dead_code))]
 struct ConnectionResult {
     forward_duration: f64,
@@ -188,6 +209,9 @@ where
     pub parser_factory: fn() -> Par,
     pub pipeline: Arc<Pip>,
     pub router: Arc<Rtr>,
+    pub error_responder: Option<Arc<dyn ErrorToBytes + Send + Sync>>,
+    pub buffer_limits: BufferLimits,
+    pub drain_timeout: Duration,
     #[cfg(feature = "metrics-full")]
     pub recorder: Option<Arc<RecorderHandle>>,
 }
@@ -208,6 +232,8 @@ where
         pipeline: Arc<Pip>,
         router: Arc<Rtr>,
         otel: Arc<OtelMetrics>,
+        error_responder: Option<Arc<dyn ErrorToBytes + Send + Sync>>,
+        buffer_limits: Arc<BufferLimits>,
         #[cfg(feature = "metrics-full")] recorder: Option<Arc<RecorderHandle>>,
         #[cfg(feature = "metrics-full")] start_time: Instant,
     ) {
@@ -220,6 +246,7 @@ where
         let conn_start = Instant::now();
         let result = Self::do_connection(
             read_half, &mut write_half, parser_factory, pipeline, router, &otel,
+            &error_responder, &buffer_limits,
             #[cfg(feature = "metrics-full")] &recorder,
         ).await;
 
@@ -248,12 +275,13 @@ where
                 );
             }
             Err(e) => {
-                let error_type = match e {
-                    RailscaleError::RoutingFailed(_) => "routing",
-                    RailscaleError::NoRoutingFrame => "no_routing_frame",
-                    RailscaleError::ConnectionClosed => "connection_closed",
-                    RailscaleError::Parse(_) => "parse",
-                    RailscaleError::Io(_) => "io",
+                let error_type = match &e.kind {
+                    ErrorKind::RoutingFailed(_) => "routing",
+                    ErrorKind::NoRoutingFrame => "no_routing_frame",
+                    ErrorKind::ConnectionClosed => "connection_closed",
+                    ErrorKind::Parse(_) => "parse",
+                    ErrorKind::Io(_) => "io",
+                    ErrorKind::BufferLimitExceeded => "buffer_limit_exceeded",
                 };
                 otel.conn_error(error_type);
                 warn!(
@@ -284,6 +312,18 @@ where
         }
     }
 
+    async fn write_error_response(
+        write_half: &mut Src::WriteHalf,
+        error_responder: &Option<Arc<dyn ErrorToBytes + Send + Sync>>,
+        err: &RailscaleError,
+    ) {
+        if let Some(responder) = error_responder {
+            let body = responder.error_bytes(err);
+            let _ = write_half.write_all(&body).await;
+            let _ = write_half.flush().await;
+        }
+    }
+
     async fn do_connection(
         read_half: Src::ReadHalf,
         write_half: &mut Src::WriteHalf,
@@ -291,6 +331,8 @@ where
         pipeline: Arc<Pip>,
         router: Arc<Rtr>,
         otel: &OtelMetrics,
+        error_responder: &Option<Arc<dyn ErrorToBytes + Send + Sync>>,
+        buffer_limits: &BufferLimits,
         #[cfg(feature = "metrics-full")] recorder: &Option<Arc<RecorderHandle>>,
     ) -> (ConnectionResult, Result<(), RailscaleError>) {
         let forward_start = Instant::now();
@@ -300,6 +342,7 @@ where
         let mut frame_count: u64 = 0;
         let mut passthrough_bytes: u64 = 0;
         let mut request_bytes: u64 = 0;
+        let mut pre_route_cumulative: usize = 0;
 
         let mut cr = ConnectionResult {
             forward_duration: 0.0,
@@ -319,11 +362,28 @@ where
                 Ok(ParsedData::Passthrough(bytes)) => {
                     passthrough_bytes += bytes.len() as u64;
                     request_bytes += bytes.len() as u64;
+                    pre_route_cumulative += bytes.len();
+                    if pre_route_cumulative > buffer_limits.max_pre_route_bytes {
+                        cr.frame_count = frame_count;
+                        cr.request_bytes = request_bytes;
+                        let err = RailscaleError::from(ErrorKind::BufferLimitExceeded).in_phase(Phase::Parse);
+                        Self::write_error_response(write_half, error_responder, &err).await;
+                        return (cr, Err(err));
+                    }
                     pre_route_buf.push(bytes);
                 }
                 Ok(ParsedData::Parsed(frame)) => {
                     frame_count += 1;
-                    request_bytes += frame.as_bytes().len() as u64;
+                    let frame_len = frame.as_bytes().len();
+                    request_bytes += frame_len as u64;
+                    pre_route_cumulative += frame_len;
+                    if pre_route_cumulative > buffer_limits.max_pre_route_bytes {
+                        cr.frame_count = frame_count;
+                        cr.request_bytes = request_bytes;
+                        let err = RailscaleError::from(ErrorKind::BufferLimitExceeded).in_phase(Phase::Parse);
+                        Self::write_error_response(write_half, error_responder, &err).await;
+                        return (cr, Err(err));
+                    }
                     let key = frame.routing_key().map(Bytes::copy_from_slice);
                     let processed = pipeline.process(frame);
                     pre_route_buf.push(processed.into_bytes());
@@ -333,11 +393,14 @@ where
                     }
                 }
                 Err(e) => {
-                    warn!(error = %e.into(), "frame parse error");
+                    let err: RailscaleError = e.into();
+                    let err = err.in_phase(Phase::Parse);
+                    warn!(error = %err, "frame parse error");
                     otel.parse_error();
                     cr.frame_count = frame_count;
                     cr.request_bytes = request_bytes;
-                    return (cr, Err(RailscaleError::ConnectionClosed));
+                    Self::write_error_response(write_half, error_responder, &err).await;
+                    return (cr, Err(err));
                 }
             }
         }
@@ -347,7 +410,9 @@ where
             None => {
                 cr.frame_count = frame_count;
                 cr.request_bytes = request_bytes;
-                return (cr, Err(RailscaleError::NoRoutingFrame));
+                let err = RailscaleError::from(ErrorKind::NoRoutingFrame).in_phase(Phase::Parse);
+                Self::write_error_response(write_half, error_responder, &err).await;
+                return (cr, Err(err));
             }
         };
 
@@ -355,6 +420,9 @@ where
             routing_key = %String::from_utf8_lossy(&routing_key).trim(),
             "routing"
         );
+
+        let mut post_route_cumulative: usize = 0;
+        let max_post = buffer_limits.max_post_route_bytes;
 
         let ((dest_result, route_duration), post_route_buf) = tokio::join!(
             async {
@@ -371,11 +439,19 @@ where
                         Ok(ParsedData::Passthrough(bytes)) => {
                             passthrough_bytes += bytes.len() as u64;
                             request_bytes += bytes.len() as u64;
+                            post_route_cumulative += bytes.len();
+                            if post_route_cumulative > max_post {
+                                break;
+                            }
                             buf.push(bytes);
                         }
                         Ok(ParsedData::Parsed(frame)) => {
                             frame_count += 1;
                             request_bytes += frame.as_bytes().len() as u64;
+                            post_route_cumulative += frame.as_bytes().len();
+                            if post_route_cumulative > max_post {
+                                break;
+                            }
                             let processed = pipeline.process(frame);
                             buf.push(processed.into_bytes());
                         }
@@ -390,6 +466,15 @@ where
             }
         );
 
+        // upstream may already be connected via tokio::join; dest is dropped without data
+        if post_route_cumulative > max_post {
+            cr.frame_count = frame_count;
+            cr.request_bytes = request_bytes;
+            let err = RailscaleError::from(ErrorKind::BufferLimitExceeded).in_phase(Phase::Forward);
+            Self::write_error_response(write_half, error_responder, &err).await;
+            return (cr, Err(err));
+        }
+
         cr.connect_duration = route_duration;
 
         let mut dest = match dest_result {
@@ -397,7 +482,10 @@ where
             Err(e) => {
                 cr.frame_count = frame_count;
                 cr.request_bytes = request_bytes;
-                return (cr, Err(e));
+                let err: RailscaleError = e.into();
+                let err = err.in_phase(Phase::Routing);
+                Self::write_error_response(write_half, error_responder, &err).await;
+                return (cr, Err(err));
             }
         };
         cr.routed = true;
@@ -406,7 +494,7 @@ where
             r.upstream_open();
         }
 
-        let mut coalesced = bytes::BytesMut::new();
+        let mut batcher = BatchWriter::new();
         for chunk in pre_route_buf.into_iter().chain(post_route_buf.into_iter()) {
             #[cfg(feature = "log-raw")]
             trace!(
@@ -415,10 +503,10 @@ where
                 data = %String::from_utf8_lossy(&chunk),
                 "raw"
             );
-            coalesced.extend_from_slice(&chunk);
+            batcher.push_bytes(chunk);
         }
-        let total_len = coalesced.len() as u64;
-        match dest.write(coalesced.freeze()).await {
+        let total_len = batcher.len() as u64;
+        match dest.write(batcher.take()).await {
             Ok(()) => {
                 otel.bytes_written(total_len);
             }
@@ -427,7 +515,8 @@ where
                 cr.frame_count = frame_count;
                 cr.request_bytes = request_bytes;
                 cr.forward_duration = forward_start.elapsed().as_secs_f64();
-                return (cr, Err(e.into()));
+                let err: RailscaleError = e.into();
+                return (cr, Err(err.in_phase(Phase::Forward)));
             }
         }
 
@@ -446,7 +535,8 @@ where
                 cr.frame_count = frame_count;
                 cr.request_bytes = request_bytes;
                 cr.forward_duration = forward_duration;
-                return (cr, Err(e.into()));
+                let err: RailscaleError = e.into();
+                return (cr, Err(err.in_phase(Phase::Relay)));
             }
         };
         #[cfg(not(feature = "log-raw"))]
@@ -456,7 +546,8 @@ where
                 cr.frame_count = frame_count;
                 cr.request_bytes = request_bytes;
                 cr.forward_duration = forward_duration;
-                return (cr, Err(e.into()));
+                let err: RailscaleError = e.into();
+                return (cr, Err(err.in_phase(Phase::Relay)));
             }
         };
         let relay_duration = relay_start.elapsed().as_secs_f64();
@@ -484,28 +575,58 @@ where
     Rtr::Destination: 'static,
     <Rtr::Destination as StreamDestination>::Error: Send,
 {
-    async fn run(&self) -> Result<(), RailscaleError> {
+    async fn run(&self, cancel: CancellationToken) -> Result<(), RailscaleError> {
         let otel = Arc::new(OtelMetrics::new());
+        let error_responder = self.error_responder.clone();
+        let buffer_limits = Arc::new(BufferLimits {
+            max_pre_route_bytes: self.buffer_limits.max_pre_route_bytes,
+            max_post_route_bytes: self.buffer_limits.max_post_route_bytes,
+        });
         #[cfg(feature = "metrics-full")]
         let recorder = self.recorder.clone();
         #[cfg(feature = "metrics-full")]
         let start_time = Instant::now();
 
-        loop {
-            let (read_half, write_half) = self.source.accept().await.map_err(Into::into)?;
-            let parser_factory = self.parser_factory;
-            let router = Arc::clone(&self.router);
-            let pipeline = Arc::clone(&self.pipeline);
-            let otel = Arc::clone(&otel);
-            #[cfg(feature = "metrics-full")]
-            let recorder = recorder.clone();
+        let mut join_set = JoinSet::new();
 
-            tokio::spawn(Self::handle_connection(
-                read_half, write_half, parser_factory, pipeline, router,
-                otel,
-                #[cfg(feature = "metrics-full")] recorder,
-                #[cfg(feature = "metrics-full")] start_time,
-            ));
+        loop {
+            tokio::select! {
+                _ = cancel.cancelled() => {
+                    info!("shutdown signal received, draining connections");
+                    break;
+                }
+                accept_result = self.source.accept() => {
+                    let (read_half, write_half) = accept_result.map_err(Into::into)?;
+                    let parser_factory = self.parser_factory;
+                    let router = Arc::clone(&self.router);
+                    let pipeline = Arc::clone(&self.pipeline);
+                    let otel = Arc::clone(&otel);
+                    let error_responder = error_responder.clone();
+                    let buffer_limits = Arc::clone(&buffer_limits);
+                    #[cfg(feature = "metrics-full")]
+                    let recorder = recorder.clone();
+
+                    join_set.spawn(Self::handle_connection(
+                        read_half, write_half, parser_factory, pipeline, router,
+                        otel, error_responder, buffer_limits,
+                        #[cfg(feature = "metrics-full")] recorder,
+                        #[cfg(feature = "metrics-full")] start_time,
+                    ));
+                }
+            }
         }
+
+        let drain_timeout = self.drain_timeout;
+        tokio::select! {
+            _ = async { while join_set.join_next().await.is_some() {} } => {
+                info!("all connections drained");
+            }
+            _ = tokio::time::sleep(drain_timeout) => {
+                warn!("drain timeout reached, aborting remaining connections");
+                join_set.abort_all();
+            }
+        }
+
+        Ok(())
     }
 }

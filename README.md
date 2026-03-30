@@ -1,72 +1,49 @@
+# Railscale
+
 <p align="center">
-  <img src="logo.png" alt="Railscale" width="200">
+  <img src="clean.png" alt="Railscale">
 </p>
 
-# Railscale
 Insanely fast (really) streaming proxy/dns/packet capture/maybe even firewall service.
 For now it supports http header remapping and routing.
 
+# Normal usage
+- Custom DNS
+- Reverse proxy
+- Packet capture/logging
+- request matchers
+- Basic firewall
+- dev/tun mode maybe idk
+
+# Metrics & Tracing
+- OTEL
+- Logging features
+
+# Benchmarking
+- Run the shell script
+
 # Architecture
 Railscale is very complex compared to what one would expect from a proxy. The reason being is that railscale doesnt buffer requests in memory, and is tuned for maximum performance.
-The architecture is also designed to be extensible for basically any protocol. 
-The mental model i had while writing is:
-- mental model chart here todo sadly claude cant generate that 
+The architecture is also designed to be extensible for basically any network related application.
 
-#### Implementation
-```mermaid
-flowchart LR
-    subgraph source["StreamSource"]
-        direction TB
-        tcp["TcpListener::accept()"]
-        rh["ReadHalf"]
-        wh["WriteHalf"]
-        tcp --> rh
-        tcp --> wh
-    end
+### Railscale mental model:
+- TADADA
+-
 
-    subgraph parsing["FrameParser + Codec"]
-        direction TB
-        codec["HttpStreamingCodec\n(memchr \\r\\n split)"]
-        parsed["ParsedData::Parsed\n(HttpFrame)"]
-        pass["ParsedData::Passthrough\n(Body Bytes)"]
-        codec --> parsed
-        codec --> pass
-    end
+# Unorthodox networks
+<p align="center">
+  <img src="chaotic.png" alt="Chatoic">
+</p>
 
-    subgraph concurrent["Concurrent Fork"]
-        direction TB
-        subgraph routing["DestinationRouter"]
-            rk["routing_key()\n(Host / Request Line)"]
-            route["route() -> TcpStream\n(async TCP connect)"]
-            rk --> route
-        end
-        subgraph pipeline["FramePipeline (rayon)"]
-            direction TB
-            m1["Matcher 1"]
-            m2["Matcher 2"]
-            m3["Matcher N"]
-            rewrite["frame.into_bytes()"]
-            m1 --> rewrite
-            m2 --> rewrite
-            m3 --> rewrite
-        end
-    end
+- Bypass firewalls
+- Bypass strict corporate network policies
+- Rotate proxies
+- Posture spoofing
+- Tor mesh
+- NTLM gateway
+- Interconnect multiple corporate machines conveniently
+- Jail devices via openwrt
+- Virtualization & usage in restricted/monitored environments
+- *more cool shit here*
+- UDP wireguard peering to tailscale
 
-    subgraph dest["StreamDestination"]
-        direction TB
-        write["destination.write()\n(processed headers)"]
-        passw["destination.write()\n(passthrough body)"]
-        relay["relay_response()\ntokio::io::copy\n(upstream -> client)"]
-        write --> relay
-        passw --> relay
-    end
-
-    rh --> codec
-    parsed --> rk
-    parsed --> m1 & m2 & m3
-    pass --> passw
-    rewrite --> write
-    route --> dest
-    relay -.-> wh
-
-```

@@ -3,6 +3,7 @@ mod tcp;
 #[cfg(feature = "metrics-minimal")]
 mod metrics;
 
+pub use http::error::HttpErrorResponder;
 pub use http::frame::HttpFrame;
 pub use http::codec::HttpStreamingCodec;
 pub use tcp::source::TcpSource;
