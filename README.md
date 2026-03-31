@@ -7,6 +7,19 @@
 Insanely fast (really) streaming proxy/dns/packet capture/maybe even firewall service.
 For now it supports http header remapping and routing.
 Everything is named after railway things
+- Very WIP
+
+# Goals
+- HTTP 1.0, HTTP1.1, HTTP2, HTTP3 support
+- Multiplexed streams
+- Keepalive support
+- Load Balancing capabilities (reverse too)
+- DNS over TLS
+- TLS 1.3 support
+- DynDNS
+- Fully erasable types, 0 overhead abstractions
+- Correctness
+- Comfortable tailscale integration
 
 # Normal usage
 - Custom DNS
@@ -46,7 +59,7 @@ The architecture is also designed to be extensible for basically any network rel
 - Tor mesh
 - NTLM gateway
 - Interconnect multiple corporate machines conveniently
-- Jail devices via openwrt
+- Strict networks? Not when YOU ARE THE NETWORK
 - Virtualization & usage in restricted/monitored environments
 - *more cool shit here*
 - UDP wireguard peering to tailscale
