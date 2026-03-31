@@ -24,7 +24,7 @@ Everything is named after railway things
 - Run the shell script
 
 # Architecture
-Railscale is very complex compared to what one would expect from a proxy. The reason being is that railscale doesnt buffer requests in memory, and is tuned for maximum performance.
+Railscale is very complex, (mainly because I wanted the entire network layer to be statically monomorphic) compared to what one would expect from a proxy. The reason being is that railscale doesnt buffer requests in memory, and is tuned for maximum performance.
 The architecture is also designed to be extensible for basically any network related application.
 
 **(And now claude also fucked it up a bit)**
