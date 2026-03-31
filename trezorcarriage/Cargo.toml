@@ -19,3 +19,4 @@ async-stream = { workspace = true }
 rcgen = { workspace = true }
 rustls-pemfile = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "io-util"] }
+carriage = { path = "../carriage", default-features = false }
