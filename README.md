@@ -27,6 +27,8 @@ Everything is named after railway things
 Railscale is very complex compared to what one would expect from a proxy. The reason being is that railscale doesnt buffer requests in memory, and is tuned for maximum performance.
 The architecture is also designed to be extensible for basically any network related application.
 
+**(And now claude also fucked it up a bit)**
+
 ### Railscale mental model:
 - TADADA
 -
