@@ -6,6 +6,7 @@
 
 Insanely fast (really) streaming proxy/dns/packet capture/maybe even firewall service.
 For now it supports http header remapping and routing.
+Everything is named after railway things
 
 # Normal usage
 - Custom DNS

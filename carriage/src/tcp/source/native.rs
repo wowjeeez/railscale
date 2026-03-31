@@ -1,6 +1,5 @@
 use std::net::SocketAddr;
-use tokio::net::{TcpListener, UnixListener, tcp::{OwnedReadHalf, OwnedWriteHalf}};
-use tokio::net::unix::{OwnedReadHalf as UnixReadHalf, OwnedWriteHalf as UnixWriteHalf};
+use tokio::net::{TcpListener, tcp::{OwnedReadHalf, OwnedWriteHalf}};
 use tracing::info;
 use train_track::StreamSource;
 

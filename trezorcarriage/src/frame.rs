@@ -44,11 +44,20 @@ impl TlsEncryptedFrame {
         self.record_type
     }
 
+    fn handshake_payload(&self) -> Option<&[u8]> {
+        let d = &self.data;
+        if d.len() >= 6 && TlsRecordType::from_u8(d[0]).is_some() {
+            Some(&d[5..])
+        } else {
+            Some(d)
+        }
+    }
+
     fn extract_sni(&self) -> Option<&[u8]> {
         if self.record_type != TlsRecordType::Handshake {
             return None;
         }
-        let d = &self.data;
+        let d = self.handshake_payload()?;
         if d.len() < 4 {
             return None;
         }

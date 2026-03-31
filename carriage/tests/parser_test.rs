@@ -3,7 +3,7 @@ use std::pin::pin;
 use tokio::io::AsyncWriteExt;
 use tokio_stream::StreamExt;
 use train_track::{Frame, FrameParser, ParsedData};
-use carriages::HttpParser;
+use carriage::HttpParser;
 use memchr::memmem::Finder;
 
 #[tokio::test]

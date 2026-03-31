@@ -32,6 +32,6 @@ impl ErrorToFrames for HttpErrorResponder {
         response.extend_from_slice(headers.as_bytes());
         response.extend_from_slice(body.as_bytes());
 
-        vec![HttpFrame::header(response.freeze(), false)]
+        vec![HttpFrame::header(response.freeze())]
     }
 }

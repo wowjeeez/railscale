@@ -2,7 +2,7 @@ use bytes::Bytes;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
 use train_track::StreamDestination;
-use carriages::TcpDestination;
+use carriage::tcp::native::TcpDestination;
 
 #[tokio::test]
 async fn writes_to_upstream() {

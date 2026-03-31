@@ -6,6 +6,7 @@ mod atom;
 mod core;
 mod destinations;
 
+pub use io::departure::{Departure, StreamDeparture, Transload, ChannelTransload};
 pub use io::destination::StreamDestination;
 pub use error::{RailscaleError, ErrorKind, Phase};
 pub use atom::frame::{Frame, ParsedData};
@@ -23,3 +24,8 @@ pub use core::error_mapper::{ErrorToFrames, ErrorToBytes};
 pub use core::service::BufferLimits;
 pub use io::batcher::BatchWriter;
 pub use tokio_util::sync::CancellationToken;
+pub use atom::switch_rail::{SwitchRail, IdentityRail};
+pub use core::turnout::{Turnout, SimpleTurnout, FramePipelineAdapter};
+pub use core::shuttle::ShuttleLink;
+pub use core::shunt::{Shunt, RouterShunt};
+pub use atom::raw::{RawFrame, RawParser, RawPipeline};

@@ -3,11 +3,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use bytes::Bytes;
 use memchr::memmem::Finder;
-use carriages::{
-    HttpParser, HttpPipeline, HttpErrorResponder,
-    TcpSource, SockSource,
-    TcpRouter, TcpOverSockRouter,
-};
+use carriage::http_v1::{HttpParser, HttpPipeline, HttpErrorResponder};
+use carriage::tcp::native::{TcpSource,TcpRouter};
+use carriage::tcp::unix_sockets::{SockSource, TcpOverSockRouter};
 use train_track::{Pipeline, Service, RailscaleError, CancellationToken, BufferLimits};
 
 #[cfg(feature = "metrics-full")]

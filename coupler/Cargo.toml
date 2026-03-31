@@ -1,0 +1,20 @@
+[package]
+name = "coupler"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+train_track = { path = "../train_track" }
+carriage = { path = "../carriage" }
+trezorcarriage = { path = "../trezorcarriage" }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+tokio-rustls = { workspace = true }
+rustls = { workspace = true }
+bytes = { workspace = true }
+async-trait = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "io-util"] }
+tokio-util = { workspace = true }
+rcgen = { workspace = true }

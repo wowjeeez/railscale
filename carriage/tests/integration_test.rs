@@ -4,7 +4,9 @@ use memchr::memmem::Finder;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use train_track::*;
-use carriages::*;
+use carriage::*;
+use carriage::tcp::native::*;
+use carriage::tcp::unix_sockets::*;
 use std::time::Duration;
 
 async fn spawn_proxy_simple(upstream_addr: String) -> (std::net::SocketAddr, tokio::task::JoinHandle<Result<(), RailscaleError>>) {

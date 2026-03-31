@@ -1,5 +1,5 @@
 [package]
-name = "carriages"
+name = "carriage"
 version = "0.1.0"
 edition = "2024"
 
@@ -26,3 +26,4 @@ metrics-minimal = ["train_track/metrics-minimal", "dep:opentelemetry", "dep:open
 metrics-full = ["metrics-minimal", "train_track/metrics-full"]
 metrics-erased = ["train_track/metrics-erased"]
 log-raw = ["train_track/log-raw"]
+derive-debug = ["train_track/derive-debug"]

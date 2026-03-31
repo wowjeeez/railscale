@@ -1,9 +1,9 @@
 use bytes::Bytes;
 use memchr::memmem::Finder;
 use std::sync::Arc;
-use carriages::http_v1::{HttpParser, HttpPipeline};
-use carriages::init_metrics;
-use carriages::tcp::native::{TcpRouter, TcpSource};
+use carriage::http_v1::{HttpParser, HttpPipeline};
+use carriage::init_metrics;
+use carriage::tcp::native::{TcpRouter, TcpSource};
 use train_track::{CancellationToken, Pipeline, Service};
 
 #[tokio::main]
@@ -30,7 +30,7 @@ async fn main() {
             (Finder::new(b"User-Agent"), Bytes::from_static(b"railscale/1.0")),
         ])),
         router: Arc::new(TcpRouter::fixed(&upstream)),
-        error_responder: Some(Arc::new(carriages::http_v1::HttpErrorResponder)),
+        error_responder: Some(Arc::new(carriage::http_v1::HttpErrorResponder)),
         buffer_limits: Default::default(),
         drain_timeout: std::time::Duration::from_secs(30),
         #[cfg(feature = "metrics-full")]

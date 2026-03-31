@@ -60,8 +60,10 @@ impl<S: AsyncRead + Send + Unpin + 'static> FrameParser<S> for TlsParser {
                     }
                 }
 
-                let payload = payload_buf.freeze();
-                yield Ok(ParsedData::Parsed(TlsEncryptedFrame::new(payload, record_type)));
+                let mut full_record = BytesMut::with_capacity(TLS_HEADER_LEN + payload_len);
+                full_record.extend_from_slice(&header_buf[..TLS_HEADER_LEN]);
+                full_record.extend_from_slice(&payload_buf);
+                yield Ok(ParsedData::Parsed(TlsEncryptedFrame::new(full_record.freeze(), record_type)));
             }
         }
     }

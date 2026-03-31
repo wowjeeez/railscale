@@ -66,7 +66,7 @@ impl Decoder for HttpStreamingCodec {
                 let line = src.split_to(pos + 2).freeze();
 
                 if is_request_line {
-                    return Ok(Some(HttpFrame::header(line, true)));
+                    return Ok(Some(HttpFrame::request_line(line)));
                 }
 
                 let header = &line[..line.len() - 2];
@@ -79,8 +79,8 @@ impl Decoder for HttpStreamingCodec {
                 });
 
                 match replaced {
-                    Some(bytes) => Ok(Some(HttpFrame::header(bytes, false))),
-                    None => Ok(Some(HttpFrame::header(line, false))),
+                    Some(bytes) => Ok(Some(HttpFrame::header(bytes))),
+                    None => Ok(Some(HttpFrame::header(line))),
                 }
             }
             None => Ok(None),

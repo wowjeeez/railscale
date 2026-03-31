@@ -1,6 +1,6 @@
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
-use carriages::TcpSource;
+use carriage::tcp::native::TcpSource;
 use train_track::StreamSource;
 
 #[tokio::test]

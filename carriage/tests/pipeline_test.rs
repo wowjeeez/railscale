@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use memchr::memmem::Finder;
 use train_track::{Frame, FramePipeline};
-use carriages::{HttpFrame, HttpPipeline};
+use carriage::{HttpFrame, HttpPipeline};
 
 #[test]
 fn first_match_wins() {
@@ -9,7 +9,7 @@ fn first_match_wins() {
         (Finder::new(b"Host"), Bytes::from_static(b"first.com")),
         (Finder::new(b"Host"), Bytes::from_static(b"second.com")),
     ]);
-    let frame = HttpFrame::header(Bytes::from_static(b"Host: original.com\r\n"), false);
+    let frame = HttpFrame::header(Bytes::from_static(b"Host: original.com\r\n"));
     let result = pipeline.process(frame);
     assert_eq!(result.as_bytes(), b"Host: first.com\r\n");
 }
@@ -19,7 +19,7 @@ fn no_match_passes_through() {
     let pipeline = HttpPipeline::new(vec![
         (Finder::new(b"Host"), Bytes::from_static(b"replaced.com")),
     ]);
-    let frame = HttpFrame::header(Bytes::from_static(b"Content-Type: text/html\r\n"), false);
+    let frame = HttpFrame::header(Bytes::from_static(b"Content-Type: text/html\r\n"));
     let result = pipeline.process(frame);
     assert_eq!(result.as_bytes(), b"Content-Type: text/html\r\n");
 }
@@ -27,7 +27,7 @@ fn no_match_passes_through() {
 #[test]
 fn empty_matchers_passes_through() {
     let pipeline = HttpPipeline::new(vec![]);
-    let frame = HttpFrame::header(Bytes::from_static(b"Host: example.com\r\n"), false);
+    let frame = HttpFrame::header(Bytes::from_static(b"Host: example.com\r\n"));
     let result = pipeline.process(frame);
     assert_eq!(result.as_bytes(), b"Host: example.com\r\n");
 }

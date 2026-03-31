@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 use std::sync::Arc;
-use carriages::http_v1::{HttpParser, HttpPipeline};
-use carriages::init_metrics;
-use carriages::tcp::native::{TcpRouter, TcpSource};
+use carriage::http_v1::{HttpParser, HttpPipeline};
+use carriage::init_metrics;
+use carriage::tcp::native::{TcpRouter, TcpSource};
 use train_track::{CancellationToken, DestinationRouter, FileDestination, Pipeline, RailscaleError, Service};
 
 struct FileRouter;

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/helpers/common.sh"
+source "$SCRIPT_DIR/helpers/assertions.sh"
+
+# Use echo-body upstream that reflects request body back as response body
+start_echo_body_upstream
+start_proxy "127.0.0.1:${UPSTREAM_PORT}"
+
+response=$(curl -s -i --max-time 5 -d "exact-payload-check" "http://127.0.0.1:${PROXY_PORT}/")
+
+assert_status "$response" 200
+assert_body_contains "$response" "exact-payload-check"

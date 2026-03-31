@@ -55,7 +55,8 @@ async fn parses_single_handshake_record() {
     match item {
         ParsedData::Parsed(frame) => {
             assert_eq!(frame.record_type(), TlsRecordType::Handshake);
-            assert_eq!(frame.as_bytes(), payload.as_slice());
+            let expected = make_tls_record(22, &payload);
+            assert_eq!(frame.as_bytes(), expected.as_slice());
         }
         _ => panic!("expected Parsed"),
     }
@@ -78,7 +79,7 @@ async fn parses_multiple_records() {
     match item1 {
         ParsedData::Parsed(f) => {
             assert_eq!(f.record_type(), TlsRecordType::Handshake);
-            assert_eq!(f.as_bytes(), p1.as_slice());
+            assert_eq!(f.as_bytes(), make_tls_record(22, &p1).as_slice());
         }
         _ => panic!("expected Parsed"),
     }
@@ -87,7 +88,7 @@ async fn parses_multiple_records() {
     match item2 {
         ParsedData::Parsed(f) => {
             assert_eq!(f.record_type(), TlsRecordType::ApplicationData);
-            assert_eq!(f.as_bytes(), p2.as_slice());
+            assert_eq!(f.as_bytes(), make_tls_record(23, &p2).as_slice());
         }
         _ => panic!("expected Parsed"),
     }
@@ -96,7 +97,7 @@ async fn parses_multiple_records() {
     match item3 {
         ParsedData::Parsed(f) => {
             assert_eq!(f.record_type(), TlsRecordType::Alert);
-            assert_eq!(f.as_bytes(), p3.as_slice());
+            assert_eq!(f.as_bytes(), make_tls_record(21, &p3).as_slice());
         }
         _ => panic!("expected Parsed"),
     }
@@ -115,7 +116,8 @@ async fn handles_record_split_across_reads() {
     match item {
         ParsedData::Parsed(f) => {
             assert_eq!(f.record_type(), TlsRecordType::Handshake);
-            assert_eq!(f.as_bytes(), payload.as_slice());
+            let expected = make_tls_record(22, &payload);
+            assert_eq!(f.as_bytes(), expected.as_slice());
         }
         _ => panic!("expected Parsed"),
     }
@@ -152,7 +154,7 @@ async fn record_with_max_payload_16384() {
     match item {
         ParsedData::Parsed(f) => {
             assert_eq!(f.record_type(), TlsRecordType::ApplicationData);
-            assert_eq!(f.as_bytes().len(), 16384);
+            assert_eq!(f.as_bytes().len(), 16384 + 5);
         }
         _ => panic!("expected Parsed"),
     }
