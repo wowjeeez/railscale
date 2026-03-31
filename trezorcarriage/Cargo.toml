@@ -1,0 +1,21 @@
+[package]
+name = "trezorcarriage"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+train_track = { path = "../train_track", default-features = false }
+tokio-rustls = { workspace = true }
+rustls = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tokio-util = { workspace = true }
+bytes = { workspace = true }
+pin-project-lite = { workspace = true }
+async-trait = { workspace = true }
+async-stream = { workspace = true }
+
+[dev-dependencies]
+rcgen = { workspace = true }
+rustls-pemfile = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "io-util"] }

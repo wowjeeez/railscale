@@ -3,7 +3,7 @@ use memchr::memmem::Finder;
 use rayon::prelude::*;
 use tokio_util::codec::Decoder;
 use std::io;
-use crate::HttpFrame;
+use crate::http_v1::HttpFrame;
 
 fn find_crlf(buf: &[u8]) -> Option<usize> {
     let mut start = 0;

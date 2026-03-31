@@ -1,5 +1,5 @@
 [workspace]
-members = ["poc", "carriages", "train_track", "conductor"]
+members = ["poc", "carriage", "train_track", "conductor", "trezorcarriage"]
 resolver = "3"
 
 
@@ -20,3 +20,8 @@ opentelemetry = { version = "0.27", features = ["metrics"] }
 opentelemetry_sdk = { version = "0.27", features = ["metrics", "rt-tokio"] }
 opentelemetry-stdout = { version = "0.27", features = ["metrics"] }
 memmap2 = "0.9.10"
+tokio-rustls = "0.26"
+rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
+rustls-pemfile = "2"
+rcgen = "0.13"
+async-stream = "0.3"

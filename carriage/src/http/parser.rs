@@ -8,7 +8,7 @@ use tokio_stream::Stream;
 use tokio_util::codec::FramedRead;
 use train_track::{FrameParser, ParsedData};
 use crate::http::codec::HttpStreamingCodec;
-use crate::HttpFrame;
+use crate::http_v1::HttpFrame;
 
 pub struct HttpParser {
     matchers: Vec<(Finder<'static>, Bytes)>,

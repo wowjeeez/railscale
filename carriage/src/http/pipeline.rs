@@ -2,7 +2,7 @@ use bytes::Bytes;
 use memchr::memmem::Finder;
 use rayon::prelude::*;
 use train_track::{Frame, FramePipeline};
-use crate::HttpFrame;
+use crate::http_v1::HttpFrame;
 
 pub struct HttpPipeline {
     matchers: Vec<(Finder<'static>, Bytes)>,

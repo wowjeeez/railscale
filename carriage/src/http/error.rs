@@ -1,5 +1,5 @@
 use train_track::{ErrorToFrames, ErrorKind, RailscaleError};
-use crate::HttpFrame;
+use crate::http_v1::HttpFrame;
 
 pub struct HttpErrorResponder;
 

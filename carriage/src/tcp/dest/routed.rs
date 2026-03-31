@@ -1,8 +1,8 @@
 use std::time::Duration;
 use tokio::net::{TcpStream, UnixStream};
 use train_track::{DestinationRouter, ErrorKind, RailscaleError};
-use crate::TcpDestination;
-use crate::tcp::destination::TcpOverSockDestination;
+use crate::tcp::dest::native::TcpDestination;
+use crate::tcp::dest::TcpOverSockDestination;
 
 pub struct TcpRouter {
     fixed_addr: Option<String>,
