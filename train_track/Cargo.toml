@@ -15,6 +15,10 @@ memmap2 = {workspace = true}
 async-trait = {workspace = true}
 memchr = {workspace = true}
 tokio-util = { workspace = true }
+async-stream = { workspace = true }
+
+[dev-dependencies]
+async-stream = { workspace = true }
 
 [features]
 default = ["metrics-minimal"]
@@ -22,3 +26,4 @@ metrics-minimal = ["dep:opentelemetry"]
 metrics-full = ["metrics-minimal", "dep:sysinfo"]
 metrics-erased = []
 log-raw = []
+derive-debug = []
