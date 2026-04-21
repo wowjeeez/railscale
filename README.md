@@ -42,9 +42,164 @@ The architecture is also designed to be extensible for basically any network rel
 
 **(And now claude also fucked it up a bit)**
 
-### Railscale mental model:
+### Railscale mental model
 
 Everything in railscale is named after railway components. The proxy models itself as a train network — traffic is cargo moving through tracks, switches, and carriages.
+
+## How it works
+
+A request flows through the system like cargo through a rail network:
+
+```
+                         REQUEST PATH
+                         ============
+
+  Client ──TCP──▶ StreamSource                    "The station entrance"
+                     │                             Accepts incoming connections
+                     ▼                             e.g. TcpSource listening on :8080
+               FrameParser                        "Cargo inspector"
+                     │                             Parses raw bytes into typed Frames
+                     │                             e.g. HttpParser emits HttpFrame per
+                     │                             request line, header, body chunk
+                     ▼
+              ConnectionHook                      "Checkpoint officer"
+                     │                             Observes each frame without modifying
+                     │                             e.g. HttpDeriverHook extracts HTTP version,
+                     │                             body framing mode, connection mode,
+                     │                             detects CL-TE smuggling conflicts
+                     ▼
+              FramePipeline                       "Assembly line"
+                     │                             Transforms frames in-flight (sync)
+                     │                             e.g. HttpPipeline strips hop-by-hop
+                     │                             headers (Connection, TE, Upgrade...)
+                     ▼
+          ┌── routing_key found? ──┐
+          │                        │
+          ▼                        ▼
+    DestinationRouter         Stabling            "Route dispatcher" / "Train depot"
+          │                        │               Router creates new upstream connection
+          │                        │               Stabling reuses a pooled one
+          │                        │               e.g. TcpRouter connects to 10.0.0.5:80
+          └──────────┬─────────────┘
+                     ▼
+            StreamDestination                     "Terminal station"
+                     │                             Writes request bytes to upstream
+                     │                             e.g. TcpDestination wraps TcpStream
+
+
+                        RESPONSE PATH
+                        =============
+
+            StreamDestination
+                     │
+                     ▼
+           ResponseParser (optional)              "Return cargo inspector"
+                     │                             Parses upstream response into frames
+                     │                             e.g. ResponseParser handles chunked
+                     │                             encoding, Content-Length, trailers
+                     ▼
+           ResponsePipeline (optional)            "Return assembly line"
+                     │                             Transforms response frames
+                     │                             e.g. strip hop-by-hop headers again
+                     ▼
+              BatchWriter                         "Loading dock"
+                     │                             Batches response bytes (32KB chunks)
+                     │                             for efficient transmission
+                     ▼
+  Client ◀──TCP── WriteHalf
+                     │
+                     ▼
+             ┌── keep-alive? ──┐
+             │                 │
+             ▼                 ▼
+          Stabling           Close
+         (pool conn)       (teardown)
+         loop to top
+```
+
+### Where each abstraction fits
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Pipeline<Src, Par, Pip, Rtr, Hook, RPar>                    │
+│                                                             │
+│  The top-level orchestrator. Generic over everything.       │
+│  Wires all components together and runs the event loop.     │
+│                                                             │
+│  Concrete example (HTTP reverse proxy):                     │
+│    Pipeline<TcpSource, HttpParser, HttpPipeline,            │
+│             TcpRouter, HttpDeriverHook, ResponseParser>     │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────┐  ┌──────────────────┐  ┌─────────────────┐
+│   SwitchRail     │  │     Turnout      │  │     Shunt       │
+│                  │  │                  │  │                  │
+│ Frame → Frame    │  │ Frame → Option   │  │ routing_key →   │
+│ (sync transform) │  │ (filter+switch)  │  │    Departure    │
+│                  │  │                  │  │ (async connect)  │
+│ "Movable rail"   │  │ "Track switch"   │  │ "Track coupling" │
+│                  │  │                  │  │                  │
+│ e.g. IdentityRail│  │ e.g. SimpleTurnout│  │ e.g. RouterShunt│
+│ (no-op)          │  │ (rail + handler) │  │ (wraps router)  │
+│                  │  │                  │  │                  │
+│ Future:          │  │ Combines a       │  │ Alternative to   │
+│ ViaRail          │  │ SwitchRail with  │  │ Router+Stabling  │
+│ ForwardedRail    │  │ a filter closure │  │ for routing      │
+└─────────────────┘  └──────────────────┘  └─────────────────┘
+
+┌──────────────────┐  ┌──────────────────┐  ┌─────────────────┐
+│    Shuttle       │  │   Departure      │  │   Transload     │
+│                  │  │                  │  │                  │
+│ Bidirectional    │  │ Bytes → async    │  │ Frame → Channel │
+│ frame link       │  │ send to dest     │  │ (no response)   │
+│                  │  │                  │  │                  │
+│ "Shuttle train"  │  │ "Train leaving"  │  │ "Cargo transfer" │
+│                  │  │                  │  │                  │
+│ Two-way comms    │  │ StreamDeparture  │  │ ChannelTransload│
+│ via ShuttleLink  │  │ wraps            │  │ sends to mpsc   │
+│ channel pairs    │  │ StreamDestination│  │ for side output │
+└──────────────────┘  └──────────────────┘  └─────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ Derive System                                               │
+│                                                             │
+│  DerivationFormula ──▶ DeriverSession ──▶ DerivedEffect     │
+│  "Inspection rules"    "Accumulator"      "Decision"        │
+│                                                             │
+│  Matchers observe frames across phases:                     │
+│    HeaderName("content-length") → "42"                      │
+│    HeaderName("transfer-encoding") → "chunked"              │
+│    RequestLineVersion → "HTTP/1.1"                          │
+│                                                             │
+│  DerivedEffect resolves to:                                 │
+│    body_framing: Chunked | ContentLength(42) | UntilClose   │
+│    connection:   KeepAlive | Close                          │
+│    conflicts:    CL+TE detected → reject as 400             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Composing a proxy (Conductor API)
+
+```rust
+Conductor::tcp("0.0.0.0:8080")           // StreamSource: listen on TCP
+    .route_to("upstream.local:3000")      // DestinationRouter: fixed destination
+    .with_keepalive()                     // Enable connection pooling (Stabling)
+    .run()                                // Assemble Pipeline and start serving
+    .await
+```
+
+### Composing with Coupler (protocol flows)
+
+```
+ForwardHttp       HTTP  ──▶ HTTP     (OverTcp shunt)
+ForwardHttps      HTTPS ──▶ HTTPS    (OverTls shunt)
+ForwardTls        TLS   ──▶ TLS      (passthrough, no decryption)
+ForwardHttpToHttps HTTP ──▶ HTTPS    (OverTls shunt, upgrade)
+ForwardHttpsToHttp HTTPS──▶ HTTP     (OverTcp shunt, terminate+downgrade)
+
+Each Forward* wires up the full Pipeline with the right
+parser, pipeline, shunt, and TLS config for that flow.
+```
 
 ## Glossary
 
