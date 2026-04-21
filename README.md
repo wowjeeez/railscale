@@ -155,17 +155,36 @@ flowchart LR
     style E fill:#4a3a2d,stroke:#8a6a4a
 ```
 
-### Composing a proxy (Conductor API)
+### Composing a proxy
+
+There are three levels of abstraction for building a proxy, from high to low:
+
+#### Level 1: Conductor (highest level)
 
 ```rust
-Conductor::tcp("0.0.0.0:8080")           // StreamSource: listen on TCP
-    .route_to("upstream.local:3000")      // DestinationRouter: fixed destination
-    .with_keepalive()                     // Enable connection pooling (Stabling)
-    .run()                                // Assemble Pipeline and start serving
-    .await
+// Simple reverse proxy with header replacement
+Conductor::tcp("0.0.0.0:8080")
+    .route_tcp("backend.internal:3000")
+    .replace_header("User-Agent", "railscale/1.0")
+    .max_request_bytes(16 * 1024 * 1024)
+    .inactivity_timeout(Duration::from_secs(30))
+    .run(cancel_token)
+    .await?;
+
+// Dynamic routing (routes to Host header value)
+Conductor::tcp("0.0.0.0:8080")
+    .route_dynamic()
+    .run(cancel_token)
+    .await?;
+
+// Unix socket → TCP
+Conductor::sock("/tmp/railscale.sock")
+    .route_tcp("127.0.0.1:9090")
+    .run(cancel_token)
+    .await?;
 ```
 
-### Composing with Coupler (protocol flows)
+#### Level 2: Coupler flows (protocol-aware)
 
 ```mermaid
 flowchart LR
@@ -184,6 +203,268 @@ flowchart LR
     subgraph ForwardHttpsToHttp
         D1[HTTPS] -->|OverTcp| D2[HTTP]
     end
+```
+
+```rust
+// HTTP → HTTP
+ForwardHttp::builder()
+    .bind("0.0.0.0:8080")
+    .upstream("backend:3000")
+    .buffer_limits(BufferLimits {
+        max_pre_route_bytes: 10 * 1024 * 1024,
+        max_post_route_bytes: 10 * 1024 * 1024,
+    })
+    .build().await?
+    .run(cancel_token).await?;
+
+// HTTPS → HTTPS (TLS termination + re-encryption)
+ForwardHttps::builder()
+    .bind("0.0.0.0:443")
+    .upstream("backend:443")
+    .tls_config(server_tls_config)
+    .build().await?
+    .run(cancel_token).await?;
+
+// HTTP → HTTPS (upgrade)
+ForwardHttpToHttps::new("0.0.0.0:80", "secure-backend:443").await?
+    .run(cancel_token).await?;
+
+// TLS passthrough (no decryption, SNI-based routing)
+ForwardTls::new("0.0.0.0:443", "backend:443").await?
+    .run(cancel_token).await?;
+```
+
+#### Level 3: Pipeline (full control)
+
+Every higher-level API ultimately builds a `Pipeline` struct:
+
+```rust
+let pipeline = Pipeline {
+    // Source: where connections come from
+    source: TcpSource::bind("127.0.0.1:8080").await?,
+
+    // Parser: how to parse raw bytes into frames
+    parser_factory: || HttpParser::new(vec![]),
+
+    // Pipeline: how to transform frames in-flight
+    pipeline: Arc::new(HttpPipeline::new(vec![
+        (Finder::new(b"User-Agent"), Bytes::from_static(b"railscale/1.0")),
+        (Finder::new(b"X-Real-IP"), Bytes::from_static(b"10.0.0.1")),
+    ])),
+
+    // Router: where to send traffic
+    router: Arc::new(TcpRouter::fixed("backend:3000")),
+
+    // Hook: observe frames for validation (smuggling detection etc.)
+    hook_factory: || HttpDeriverHook::new(),
+
+    // Response handling (optional — None means raw passthrough)
+    response_parser_factory: Some(|| ResponseParser::new()),
+    response_pipeline: Some(Arc::new(HttpPipeline::keepalive(vec![]))),
+    response_hook_factory: Some(|| HttpDeriverHook::new()),
+
+    // Connection pooling
+    stabling_config: Some(StablingConfig {
+        max_idle_per_host: 16,
+        max_total_idle: 128,
+        idle_timeout: Duration::from_secs(120),
+        enabled: true,
+    }),
+
+    // Error handling
+    error_responder: Some(Arc::new(HttpErrorResponder)),
+    buffer_limits: BufferLimits::default(),
+    drain_timeout: Duration::from_secs(30),
+
+    turnout_name: "proxy".to_string(),
+    capture_dir: None,
+};
+
+pipeline.run(cancel_token).await?;
+```
+
+### Individual components
+
+#### SwitchRail — frame-to-frame transform
+
+```rust
+// SwitchRail is a sync transform: Frame in → Frame out
+pub trait SwitchRail: Send + Sync {
+    type Input: Frame;
+    type Output: Frame;
+    fn switch(&self, input: Self::Input) -> Self::Output;
+}
+
+// Built-in: no-op pass-through
+let rail = IdentityRail::<HttpFrame>::new();
+let output = rail.switch(input); // unchanged
+
+// Custom: add a header to every request
+struct AddHeaderRail {
+    name: Bytes,
+    value: Bytes,
+}
+
+impl SwitchRail for AddHeaderRail {
+    type Input = HttpFrame;
+    type Output = HttpFrame;
+    fn switch(&self, input: HttpFrame) -> HttpFrame {
+        // inject header frame into stream
+    }
+}
+```
+
+#### Turnout — filter + transform
+
+```rust
+// Turnout wraps a SwitchRail and can drop frames (returns Option)
+pub trait Turnout: Send + Sync {
+    type Input: Frame;
+    type Output: Frame;
+    fn process(&self, input: Self::Input) -> Option<Self::Output>;
+}
+
+// SimpleTurnout = SwitchRail + filter closure
+let turnout = SimpleTurnout::new(
+    IdentityRail::new(),
+    |frame: HttpFrame| {
+        // drop frames matching a condition
+        if frame.as_bytes().starts_with(b"X-Internal") {
+            None // filtered out
+        } else {
+            Some(frame) // pass through
+        }
+    },
+);
+
+// FramePipelineAdapter = wrap any FramePipeline as a Turnout
+let turnout = FramePipelineAdapter::new(
+    HttpPipeline::new(vec![
+        (Finder::new(b"Host"), Bytes::from_static(b"rewritten.host")),
+    ])
+);
+```
+
+#### ShuttleLink — chain turnouts
+
+```rust
+// ShuttleLink chains two Turnouts: A → B
+let first = FramePipelineAdapter::new(HttpPipeline::new(header_matchers));
+let second = FramePipelineAdapter::new(HttpPipeline::new(more_matchers));
+
+let chain = ShuttleLink::new(first, second);
+let output = chain.process(input)?; // runs through both
+```
+
+#### Shunt — connect to a destination
+
+```rust
+// Shunt creates an outbound connection from a routing key
+#[async_trait]
+pub trait Shunt: Send + Sync {
+    type Input: Frame;
+    type Departure: Departure;
+    async fn connect(&self, routing_key: &[u8]) -> Result<Self::Departure, RailscaleError>;
+}
+
+// RouterShunt wraps any DestinationRouter
+let shunt = RouterShunt::new(TcpRouter::fixed("backend:3000"));
+let departure = shunt.connect(b"example.com").await?;
+```
+
+#### Departure & Transload — send data out
+
+```rust
+// Departure: async send bytes to a destination
+#[async_trait]
+pub trait Departure: Send {
+    async fn depart(&mut self, bytes: Bytes) -> Result<(), Self::Error>;
+    fn response_reader(&mut self) -> &mut Self::ResponseReader;
+}
+
+// StreamDeparture wraps any StreamDestination
+let mut dep = StreamDeparture::new(TcpDestination::connect("backend:3000").await?);
+dep.depart(request_bytes).await?;
+let response = dep.response_reader(); // read upstream response
+
+// ChannelTransload: send bytes to a channel (no response, for side output)
+let (tx, mut rx) = tokio::sync::mpsc::channel(100);
+let mut tap = ChannelTransload::new(tx);
+tap.depart(captured_bytes).await?;
+// elsewhere: rx.recv().await to consume
+```
+
+#### Stabling — connection pooling
+
+```rust
+let stabling = Stabling::new(StablingConfig {
+    max_idle_per_host: 8,
+    max_total_idle: 64,
+    idle_timeout: Duration::from_secs(90),
+    enabled: true,
+});
+
+// Try to reuse a pooled connection
+if let Some(dest) = stabling.acquire(b"backend:3000") {
+    // reuse existing TcpStream
+} else {
+    // create new connection via router
+}
+
+// After request completes, return connection to pool
+stabling.release(Bytes::from("backend:3000"), dest);
+```
+
+#### ConnectionHook — observe & validate
+
+```rust
+pub trait ConnectionHook<F: Frame>: Send + 'static {
+    fn on_frame(&mut self, frame: &F);                     // observe each frame
+    fn validate(&self) -> Result<(), RailscaleError>;      // check after headers
+    fn should_close_connection(&self) -> bool { false }     // keep-alive decision
+    fn reset(&mut self) {}                                  // reset between requests
+}
+
+// NoHook: no validation
+let pipeline = Pipeline { hook_factory: || NoHook, .. };
+
+// HttpDeriverHook: full HTTP validation
+// - detects CL-TE smuggling → 400
+// - detects duplicate Content-Length conflicts → 400
+// - determines keep-alive vs close
+let pipeline = Pipeline { hook_factory: || HttpDeriverHook::new(), .. };
+```
+
+#### Custom DestinationRouter
+
+```rust
+// Route to different backends based on request path
+struct PathRouter;
+
+#[async_trait]
+impl DestinationRouter for PathRouter {
+    type Destination = TcpDestination;
+    async fn route(&self, routing_key: &[u8]) -> Result<TcpDestination, RailscaleError> {
+        let key = std::str::from_utf8(routing_key).unwrap_or("");
+        let upstream = if key.starts_with("/api") {
+            "api-backend:3000"
+        } else {
+            "web-backend:8080"
+        };
+        TcpDestination::connect(upstream).await
+    }
+}
+
+// Route to a file (for logging/capture)
+struct FileRouter;
+
+#[async_trait]
+impl DestinationRouter for FileRouter {
+    type Destination = FileDestination;
+    async fn route(&self, _key: &[u8]) -> Result<FileDestination, RailscaleError> {
+        FileDestination::new(PathBuf::from("captured.bin")).map_err(Into::into)
+    }
+}
 ```
 
 ## Glossary
