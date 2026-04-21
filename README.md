@@ -50,132 +50,109 @@ Everything in railscale is named after railway components. The proxy models itse
 
 A request flows through the system like cargo through a rail network:
 
-```
-                         REQUEST PATH
-                         ============
+### Request path
 
-  Client ──TCP──▶ StreamSource                    "The station entrance"
-                     │                             Accepts incoming connections
-                     ▼                             e.g. TcpSource listening on :8080
-               FrameParser                        "Cargo inspector"
-                     │                             Parses raw bytes into typed Frames
-                     │                             e.g. HttpParser emits HttpFrame per
-                     │                             request line, header, body chunk
-                     ▼
-              ConnectionHook                      "Checkpoint officer"
-                     │                             Observes each frame without modifying
-                     │                             e.g. HttpDeriverHook extracts HTTP version,
-                     │                             body framing mode, connection mode,
-                     │                             detects CL-TE smuggling conflicts
-                     ▼
-              FramePipeline                       "Assembly line"
-                     │                             Transforms frames in-flight (sync)
-                     │                             e.g. HttpPipeline strips hop-by-hop
-                     │                             headers (Connection, TE, Upgrade...)
-                     ▼
-          ┌── routing_key found? ──┐
-          │                        │
-          ▼                        ▼
-    DestinationRouter         Stabling            "Route dispatcher" / "Train depot"
-          │                        │               Router creates new upstream connection
-          │                        │               Stabling reuses a pooled one
-          │                        │               e.g. TcpRouter connects to 10.0.0.5:80
-          └──────────┬─────────────┘
-                     ▼
-            StreamDestination                     "Terminal station"
-                     │                             Writes request bytes to upstream
-                     │                             e.g. TcpDestination wraps TcpStream
+```mermaid
+flowchart TD
+    Client([Client]) -->|TCP| SS["StreamSource\n<i>Station entrance</i>"]
+    SS -->|raw bytes| FP["FrameParser\n<i>Cargo inspector</i>"]
+    FP -->|typed Frames| CH["ConnectionHook\n<i>Checkpoint officer</i>"]
+    CH -->|observed frames| FPL["FramePipeline\n<i>Assembly line</i>"]
+    FPL --> RK{routing_key\nfound?}
+    RK -->|new connection| DR["DestinationRouter\n<i>Route dispatcher</i>"]
+    RK -->|pooled connection| ST["Stabling\n<i>Train depot</i>"]
+    DR --> SD["StreamDestination\n<i>Terminal station</i>"]
+    ST --> SD
 
-
-                        RESPONSE PATH
-                        =============
-
-            StreamDestination
-                     │
-                     ▼
-           ResponseParser (optional)              "Return cargo inspector"
-                     │                             Parses upstream response into frames
-                     │                             e.g. ResponseParser handles chunked
-                     │                             encoding, Content-Length, trailers
-                     ▼
-           ResponsePipeline (optional)            "Return assembly line"
-                     │                             Transforms response frames
-                     │                             e.g. strip hop-by-hop headers again
-                     ▼
-              BatchWriter                         "Loading dock"
-                     │                             Batches response bytes (32KB chunks)
-                     │                             for efficient transmission
-                     ▼
-  Client ◀──TCP── WriteHalf
-                     │
-                     ▼
-             ┌── keep-alive? ──┐
-             │                 │
-             ▼                 ▼
-          Stabling           Close
-         (pool conn)       (teardown)
-         loop to top
+    style SS fill:#2d4a2d,stroke:#4a7a4a
+    style FP fill:#2d3a4a,stroke:#4a6a8a
+    style CH fill:#4a3a2d,stroke:#8a6a4a
+    style FPL fill:#2d3a4a,stroke:#4a6a8a
+    style DR fill:#3a2d4a,stroke:#6a4a8a
+    style ST fill:#3a2d4a,stroke:#6a4a8a
+    style SD fill:#2d4a2d,stroke:#4a7a4a
 ```
 
-### Where each abstraction fits
+**Concrete example (HTTP reverse proxy):**
+- `StreamSource` → `TcpSource` listening on `:8080`
+- `FrameParser` → `HttpParser` emits `HttpFrame` per request line, header, body chunk
+- `ConnectionHook` → `HttpDeriverHook` extracts HTTP version, body framing, detects CL-TE smuggling
+- `FramePipeline` → `HttpPipeline` strips hop-by-hop headers (Connection, TE, Upgrade...)
+- `DestinationRouter` → `TcpRouter` connects to `10.0.0.5:80`
+- `Stabling` → reuses pooled upstream connections
 
+### Response path
+
+```mermaid
+flowchart TD
+    SD["StreamDestination"] -->|upstream bytes| RP["ResponseParser\n<i>Return cargo inspector</i>"]
+    RP -->|response frames| RPL["ResponsePipeline\n<i>Return assembly line</i>"]
+    RPL --> BW["BatchWriter\n<i>Loading dock — 32KB chunks</i>"]
+    BW -->|TCP| Client([Client])
+    Client --> KA{keep-alive?}
+    KA -->|yes| ST["Stabling\n<i>pool connection, loop</i>"]
+    KA -->|no| CL["Close\n<i>teardown</i>"]
+
+    style RP fill:#2d3a4a,stroke:#4a6a8a
+    style RPL fill:#2d3a4a,stroke:#4a6a8a
+    style BW fill:#4a3a2d,stroke:#8a6a4a
+    style ST fill:#3a2d4a,stroke:#6a4a8a
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ Pipeline<Src, Par, Pip, Rtr, Hook, RPar>                    │
-│                                                             │
-│  The top-level orchestrator. Generic over everything.       │
-│  Wires all components together and runs the event loop.     │
-│                                                             │
-│  Concrete example (HTTP reverse proxy):                     │
-│    Pipeline<TcpSource, HttpParser, HttpPipeline,            │
-│             TcpRouter, HttpDeriverHook, ResponseParser>     │
-└─────────────────────────────────────────────────────────────┘
 
-┌─────────────────┐  ┌──────────────────┐  ┌─────────────────┐
-│   SwitchRail     │  │     Turnout      │  │     Shunt       │
-│                  │  │                  │  │                  │
-│ Frame → Frame    │  │ Frame → Option   │  │ routing_key →   │
-│ (sync transform) │  │ (filter+switch)  │  │    Departure    │
-│                  │  │                  │  │ (async connect)  │
-│ "Movable rail"   │  │ "Track switch"   │  │ "Track coupling" │
-│                  │  │                  │  │                  │
-│ e.g. IdentityRail│  │ e.g. SimpleTurnout│  │ e.g. RouterShunt│
-│ (no-op)          │  │ (rail + handler) │  │ (wraps router)  │
-│                  │  │                  │  │                  │
-│ Future:          │  │ Combines a       │  │ Alternative to   │
-│ ViaRail          │  │ SwitchRail with  │  │ Router+Stabling  │
-│ ForwardedRail    │  │ a filter closure │  │ for routing      │
-└─────────────────┘  └──────────────────┘  └─────────────────┘
+### Abstraction map
 
-┌──────────────────┐  ┌──────────────────┐  ┌─────────────────┐
-│    Shuttle       │  │   Departure      │  │   Transload     │
-│                  │  │                  │  │                  │
-│ Bidirectional    │  │ Bytes → async    │  │ Frame → Channel │
-│ frame link       │  │ send to dest     │  │ (no response)   │
-│                  │  │                  │  │                  │
-│ "Shuttle train"  │  │ "Train leaving"  │  │ "Cargo transfer" │
-│                  │  │                  │  │                  │
-│ Two-way comms    │  │ StreamDeparture  │  │ ChannelTransload│
-│ via ShuttleLink  │  │ wraps            │  │ sends to mpsc   │
-│ channel pairs    │  │ StreamDestination│  │ for side output │
-└──────────────────┘  └──────────────────┘  └─────────────────┘
+```mermaid
+flowchart LR
+    subgraph Orchestration
+        P["Pipeline\n<i>Src, Par, Pip, Rtr, Hook, RPar</i>"]
+    end
 
-┌─────────────────────────────────────────────────────────────┐
-│ Derive System                                               │
-│                                                             │
-│  DerivationFormula ──▶ DeriverSession ──▶ DerivedEffect     │
-│  "Inspection rules"    "Accumulator"      "Decision"        │
-│                                                             │
-│  Matchers observe frames across phases:                     │
-│    HeaderName("content-length") → "42"                      │
-│    HeaderName("transfer-encoding") → "chunked"              │
-│    RequestLineVersion → "HTTP/1.1"                          │
-│                                                             │
-│  DerivedEffect resolves to:                                 │
-│    body_framing: Chunked | ContentLength(42) | UntilClose   │
-│    connection:   KeepAlive | Close                          │
-│    conflicts:    CL+TE detected → reject as 400             │
-└─────────────────────────────────────────────────────────────┘
+    subgraph "Frame transforms"
+        SR["SwitchRail\n<i>Frame → Frame</i>\nsync transform\n\ne.g. IdentityRail"]
+        T["Turnout\n<i>Frame → Option&lt;Frame&gt;</i>\nfilter + switch\n\ne.g. SimpleTurnout"]
+        SR -.->|used by| T
+    end
+
+    subgraph Routing
+        SH["Shunt\n<i>routing_key → Departure</i>\nasync connect\n\ne.g. RouterShunt"]
+    end
+
+    subgraph Transport
+        DEP["Departure\n<i>Bytes → async send</i>\n\ne.g. StreamDeparture"]
+        TL["Transload\n<i>Frame → Channel</i>\nside output\n\ne.g. ChannelTransload"]
+        SHU["Shuttle\n<i>bidirectional link</i>\ntwo-way comms\n\ne.g. ShuttleLink"]
+    end
+
+    subgraph "Derive system"
+        DF["DerivationFormula\n<i>Inspection rules</i>"] --> DS["DeriverSession\n<i>Accumulator</i>"]
+        DS --> DE["DerivedEffect\n<i>Decision</i>"]
+    end
+
+    style SR fill:#2d4a2d,stroke:#4a7a4a
+    style T fill:#2d4a2d,stroke:#4a7a4a
+    style SH fill:#3a2d4a,stroke:#6a4a8a
+    style DEP fill:#4a3a2d,stroke:#8a6a4a
+    style TL fill:#4a3a2d,stroke:#8a6a4a
+    style SHU fill:#4a3a2d,stroke:#8a6a4a
+    style DF fill:#2d3a4a,stroke:#4a6a8a
+    style DS fill:#2d3a4a,stroke:#4a6a8a
+    style DE fill:#2d3a4a,stroke:#4a6a8a
+```
+
+### Derive system detail
+
+```mermaid
+flowchart LR
+    M1["HeaderName\n('content-length')"] -->|"'42'"| S["DeriverSession"]
+    M2["HeaderName\n('transfer-encoding')"] -->|"'chunked'"| S
+    M3["RequestLineVersion"] -->|"'HTTP/1.1'"| S
+    S --> E["DerivedEffect"]
+    E --> BF["body_framing:\nChunked | ContentLength | UntilClose"]
+    E --> CM["connection:\nKeepAlive | Close"]
+    E --> CF["conflicts:\nCL+TE → reject 400"]
+
+    style S fill:#2d3a4a,stroke:#4a6a8a
+    style E fill:#4a3a2d,stroke:#8a6a4a
 ```
 
 ### Composing a proxy (Conductor API)
@@ -190,15 +167,23 @@ Conductor::tcp("0.0.0.0:8080")           // StreamSource: listen on TCP
 
 ### Composing with Coupler (protocol flows)
 
-```
-ForwardHttp       HTTP  ──▶ HTTP     (OverTcp shunt)
-ForwardHttps      HTTPS ──▶ HTTPS    (OverTls shunt)
-ForwardTls        TLS   ──▶ TLS      (passthrough, no decryption)
-ForwardHttpToHttps HTTP ──▶ HTTPS    (OverTls shunt, upgrade)
-ForwardHttpsToHttp HTTPS──▶ HTTP     (OverTcp shunt, terminate+downgrade)
-
-Each Forward* wires up the full Pipeline with the right
-parser, pipeline, shunt, and TLS config for that flow.
+```mermaid
+flowchart LR
+    subgraph ForwardHttp
+        H1[HTTP] -->|OverTcp| H2[HTTP]
+    end
+    subgraph ForwardHttps
+        S1[HTTPS] -->|OverTls| S2[HTTPS]
+    end
+    subgraph ForwardTls
+        T1[TLS] -->|passthrough| T2[TLS]
+    end
+    subgraph ForwardHttpToHttps
+        U1[HTTP] -->|OverTls| U2[HTTPS]
+    end
+    subgraph ForwardHttpsToHttp
+        D1[HTTPS] -->|OverTcp| D2[HTTP]
+    end
 ```
 
 ## Glossary
