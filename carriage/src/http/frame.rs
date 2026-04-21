@@ -4,6 +4,7 @@ use train_track::{Frame, FramePhase, PhasedFrame};
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum HttpPhase {
     RequestLine,
+    StatusLine,
     Header,
     EndOfHeaders,
     Body,
@@ -32,7 +33,7 @@ impl HttpFrame {
     }
 
     pub fn end_of_headers() -> Self {
-        Self { data: Bytes::new(), phase: HttpPhase::EndOfHeaders, routing: false }
+        Self { data: Bytes::from_static(b"\r\n"), phase: HttpPhase::EndOfHeaders, routing: false }
     }
 
     pub fn body(data: Bytes) -> Self {
@@ -41,6 +42,14 @@ impl HttpFrame {
 
     pub fn trailer(data: Bytes) -> Self {
         Self { data, phase: HttpPhase::Trailer, routing: false }
+    }
+
+    pub fn status_line(data: Bytes) -> Self {
+        Self { data, phase: HttpPhase::StatusLine, routing: false }
+    }
+
+    pub fn is_status_line(&self) -> bool {
+        self.phase == HttpPhase::StatusLine
     }
 
     pub fn is_end_of_headers(&self) -> bool {

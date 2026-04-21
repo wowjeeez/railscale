@@ -1,6 +1,6 @@
 use bytes::BytesMut;
 use tokio_util::codec::Decoder;
-use carriage::{HttpStreamingCodec, HttpFrame};
+use carriage::HttpStreamingCodec;
 use train_track::Frame;
 
 #[test]

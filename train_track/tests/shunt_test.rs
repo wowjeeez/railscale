@@ -9,21 +9,25 @@ impl Frame for TestFrame {
     fn routing_key(&self) -> Option<&[u8]> { Some(&self.0) }
 }
 
-struct MockDestination;
+struct MockDestination {
+    empty: tokio::io::Empty,
+}
+
+impl MockDestination {
+    fn new() -> Self { Self { empty: tokio::io::empty() } }
+}
 
 #[async_trait::async_trait]
 impl StreamDestination for MockDestination {
     type Error = RailscaleError;
+    type ResponseReader = tokio::io::Empty;
 
     async fn write(&mut self, _bytes: Bytes) -> Result<(), Self::Error> {
         Ok(())
     }
 
-    async fn relay_response<W: tokio::io::AsyncWrite + Send + Unpin>(
-        &mut self,
-        _client: &mut W,
-    ) -> Result<u64, Self::Error> {
-        Ok(42)
+    fn response_reader(&mut self) -> &mut tokio::io::Empty {
+        &mut self.empty
     }
 }
 
@@ -34,7 +38,7 @@ impl DestinationRouter for MockRouter {
     type Destination = MockDestination;
 
     async fn route(&self, _routing_key: &[u8]) -> Result<Self::Destination, RailscaleError> {
-        Ok(MockDestination)
+        Ok(MockDestination::new())
     }
 }
 
@@ -53,9 +57,7 @@ impl DestinationRouter for FailRouter {
 async fn router_shunt_connects_via_router() {
     let shunt = RouterShunt::<TestFrame, _>::new(MockRouter);
     let mut dep = shunt.connect(b"test-key").await.unwrap();
-    let mut buf = Vec::new();
-    let relayed = dep.relay_response(&mut buf).await.unwrap();
-    assert_eq!(relayed, 42);
+    let _reader = dep.response_reader();
 }
 
 #[tokio::test]

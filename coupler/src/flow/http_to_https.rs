@@ -2,8 +2,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::net::SocketAddr;
 use tokio_util::sync::CancellationToken;
-use train_track::{Pipeline, Service, BufferLimits, ErrorToBytes, RailscaleError, ErrorKind};
-use carriage::http_v1::{HttpParser, HttpErrorResponder, HttpPipeline};
+use train_track::{Pipeline, Service, BufferLimits, ErrorToBytes, RailscaleError, ErrorKind, StablingConfig};
+use carriage::http_v1::{HttpParser, HttpErrorResponder, HttpPipeline, HttpDeriverHook, ResponseParser};
 use carriage::tcp::native::TcpSource;
 use trezorcarriage::TlsClientRouter;
 
@@ -48,11 +48,18 @@ impl ForwardHttpToHttps {
         let pipeline = Pipeline {
             source: self.source,
             parser_factory: || HttpParser::new(vec![]),
-            pipeline: Arc::new(HttpPipeline::new(vec![])),
+            pipeline: Arc::new(HttpPipeline::keepalive(vec![])),
             router: Arc::new(TlsClientRouter::fixed(self.upstream, self.tls_config)),
             error_responder: self.error_responder,
             buffer_limits: self.buffer_limits,
             drain_timeout: self.drain_timeout,
+            hook_factory: || HttpDeriverHook::new(),
+            response_parser_factory: Some(|| ResponseParser::new()),
+            response_pipeline: Some(Arc::new(HttpPipeline::keepalive(vec![]))),
+            response_hook_factory: Some(|| HttpDeriverHook::new()),
+            stabling_config: Some(StablingConfig::default()),
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
         };
         pipeline.run(cancel).await
     }

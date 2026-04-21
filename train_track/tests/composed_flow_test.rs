@@ -124,19 +124,25 @@ async fn full_flow_with_shunt() {
     impl DestinationRouter for FixedRouter {
         type Destination = NullDest;
         async fn route(&self, _key: &[u8]) -> Result<NullDest, RailscaleError> {
-            Ok(NullDest)
+            Ok(NullDest::new())
         }
     }
 
-    struct NullDest;
+    struct NullDest {
+        empty: tokio::io::Empty,
+    }
+
+    impl NullDest {
+        fn new() -> Self { Self { empty: tokio::io::empty() } }
+    }
 
     #[async_trait::async_trait]
     impl StreamDestination for NullDest {
         type Error = RailscaleError;
+        type ResponseReader = tokio::io::Empty;
+
         async fn write(&mut self, _bytes: Bytes) -> Result<(), Self::Error> { Ok(()) }
-        async fn relay_response<W: tokio::io::AsyncWrite + Send + Unpin>(
-            &mut self, _client: &mut W,
-        ) -> Result<u64, Self::Error> { Ok(0) }
+        fn response_reader(&mut self) -> &mut tokio::io::Empty { &mut self.empty }
     }
 
     let flow = ShuttleLink::new(

@@ -6,7 +6,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_rustls::TlsConnector;
 use tokio_util::sync::CancellationToken;
-use train_track::{Pipeline, Service, BufferLimits};
+use train_track::{Pipeline, Service, BufferLimits, NoHook};
 use trezorcarriage::TlsSource;
 use carriage::HttpParser;
 use carriage::HttpPipeline;
@@ -81,6 +81,13 @@ async fn tls_termination_to_plaintext_upstream() {
             error_responder: None,
             buffer_limits: BufferLimits::default(),
             drain_timeout: Duration::from_secs(5),
+            hook_factory: || NoHook,
+            response_parser_factory: None::<fn() -> HttpParser>,
+            response_pipeline: None,
+            response_hook_factory: None,
+            stabling_config: None,
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
         };
         pipeline.run(cancel_clone).await
     });
@@ -144,6 +151,13 @@ async fn tls_termination_preserves_request_body() {
             error_responder: None,
             buffer_limits: BufferLimits::default(),
             drain_timeout: Duration::from_secs(5),
+            hook_factory: || NoHook,
+            response_parser_factory: None::<fn() -> HttpParser>,
+            response_pipeline: None,
+            response_hook_factory: None,
+            stabling_config: None,
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
         };
         pipeline.run(cancel_clone).await
     });

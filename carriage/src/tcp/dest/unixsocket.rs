@@ -2,9 +2,11 @@ use std::time::Duration;
 use bytes::Bytes;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::UnixStream;
+use tokio::net::unix::{OwnedReadHalf, OwnedWriteHalf};
 use train_track::StreamDestination;
 
 
+#[allow(dead_code)]
 pub async fn copy_with_inactivity_timeout<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
     reader: &mut R,
     writer: &mut W,
@@ -32,13 +34,15 @@ pub async fn copy_with_inactivity_timeout<R: AsyncRead + Unpin, W: AsyncWrite + 
 
 
 pub struct TcpOverSockDestination {
-    upstream: UnixStream,
+    read_half: OwnedReadHalf,
+    write_half: OwnedWriteHalf,
     inactivity_timeout: Option<Duration>,
 }
 
 impl TcpOverSockDestination {
     pub fn new(stream: UnixStream) -> Self {
-        Self { upstream: stream, inactivity_timeout: None }
+        let (read_half, write_half) = stream.into_split();
+        Self { read_half, write_half, inactivity_timeout: None }
     }
 
     pub fn with_timeout(mut self, d: Duration) -> Self {
@@ -50,15 +54,13 @@ impl TcpOverSockDestination {
 #[async_trait::async_trait]
 impl StreamDestination for TcpOverSockDestination {
     type Error = std::io::Error;
+    type ResponseReader = OwnedReadHalf;
 
     async fn write(&mut self, bytes: Bytes) -> Result<(), Self::Error> {
-        self.upstream.write_all(&bytes).await
+        self.write_half.write_all(&bytes).await
     }
 
-    async fn relay_response<W: AsyncWrite + Send + Unpin>(&mut self, client: &mut W) -> Result<u64, Self::Error> {
-        match self.inactivity_timeout {
-            Some(timeout) => copy_with_inactivity_timeout(&mut self.upstream, client, timeout).await,
-            None => tokio::io::copy(&mut self.upstream, client).await,
-        }
+    fn response_reader(&mut self) -> &mut OwnedReadHalf {
+        &mut self.read_half
     }
 }

@@ -1,16 +1,15 @@
 use bytes::Bytes;
-use tokio::io::AsyncWrite;
+use tokio::io::AsyncRead;
 use crate::RailscaleError;
 use crate::io::destination::StreamDestination;
 
 #[async_trait::async_trait]
 pub trait Departure: Send {
     type Error: Into<RailscaleError>;
+    type ResponseReader: AsyncRead + Send + Unpin;
+
     async fn depart(&mut self, bytes: Bytes) -> Result<(), Self::Error>;
-    async fn relay_response<W: AsyncWrite + Send + Unpin>(
-        &mut self,
-        client: &mut W,
-    ) -> Result<u64, Self::Error>;
+    fn response_reader(&mut self) -> &mut Self::ResponseReader;
 }
 
 pub struct StreamDeparture<D>(D);
@@ -24,16 +23,14 @@ impl<D> StreamDeparture<D> {
 #[async_trait::async_trait]
 impl<D: StreamDestination> Departure for StreamDeparture<D> {
     type Error = D::Error;
+    type ResponseReader = D::ResponseReader;
 
     async fn depart(&mut self, bytes: Bytes) -> Result<(), Self::Error> {
         self.0.write(bytes).await
     }
 
-    async fn relay_response<W: AsyncWrite + Send + Unpin>(
-        &mut self,
-        client: &mut W,
-    ) -> Result<u64, Self::Error> {
-        self.0.relay_response(client).await
+    fn response_reader(&mut self) -> &mut D::ResponseReader {
+        self.0.response_reader()
     }
 }
 
@@ -41,17 +38,19 @@ pub trait Transload: Departure {}
 
 pub struct ChannelTransload {
     tx: tokio::sync::mpsc::Sender<Bytes>,
+    empty: tokio::io::Empty,
 }
 
 impl ChannelTransload {
     pub fn new(tx: tokio::sync::mpsc::Sender<Bytes>) -> Self {
-        Self { tx }
+        Self { tx, empty: tokio::io::empty() }
     }
 }
 
 #[async_trait::async_trait]
 impl Departure for ChannelTransload {
     type Error = RailscaleError;
+    type ResponseReader = tokio::io::Empty;
 
     async fn depart(&mut self, bytes: Bytes) -> Result<(), Self::Error> {
         self.tx.send(bytes).await.map_err(|_| {
@@ -61,11 +60,8 @@ impl Departure for ChannelTransload {
         })
     }
 
-    async fn relay_response<W: AsyncWrite + Send + Unpin>(
-        &mut self,
-        _client: &mut W,
-    ) -> Result<u64, Self::Error> {
-        Ok(0)
+    fn response_reader(&mut self) -> &mut tokio::io::Empty {
+        &mut self.empty
     }
 }
 

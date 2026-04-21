@@ -1,5 +1,6 @@
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+use train_track::NoHook;
 use bogie::harness::*;
 
 #[tokio::test]
@@ -124,6 +125,13 @@ async fn unix_socket_get() {
             error_responder: Some(Arc::new(HttpErrorResponder)),
             buffer_limits: Default::default(),
             drain_timeout: Duration::from_secs(30),
+            hook_factory: || NoHook,
+            response_parser_factory: None::<fn() -> HttpParser>,
+            response_pipeline: None,
+            response_hook_factory: None,
+            stabling_config: None,
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
             #[cfg(feature = "metrics-full")]
             recorder: None,
         };

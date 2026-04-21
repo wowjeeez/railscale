@@ -1,4 +1,6 @@
 mod error;
+#[cfg(feature = "capture")] pub mod capture;
+#[cfg(feature = "capture")] pub use capture::{CaptureHandle, Direction};
 #[cfg(feature = "metrics-full")]
 pub mod recorder;
 mod io;
@@ -29,3 +31,5 @@ pub use core::turnout::{Turnout, SimpleTurnout, FramePipelineAdapter};
 pub use core::shuttle::ShuttleLink;
 pub use core::shunt::{Shunt, RouterShunt};
 pub use atom::raw::{RawFrame, RawParser, RawPipeline};
+pub use core::hook::{ConnectionHook, NoHook};
+pub use core::stabling::{Stabling, StablingConfig};

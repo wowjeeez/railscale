@@ -1,5 +1,5 @@
 [workspace]
-members = ["poc", "carriage", "train_track", "conductor", "trezorcarriage", "bogie", "coupler"]
+members = ["poc", "carriage", "train_track", "conductor", "trezorcarriage", "bogie", "coupler", "proxies"]
 resolver = "3"
 
 

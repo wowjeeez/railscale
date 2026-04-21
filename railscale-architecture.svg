@@ -1,0 +1,778 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800">
+  <defs>
+    <!-- Glows and Filters -->
+    <filter id="glow-cyan" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="glow-amber" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="glow-soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="glow-strong" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+    <filter id="inner-glow">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+
+    <!-- Gradients -->
+    <linearGradient id="track-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.3"/>
+      <stop offset="20%" stop-color="#00d4ff" stop-opacity="1"/>
+      <stop offset="80%" stop-color="#00d4ff" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#00d4ff" stop-opacity="0.3"/>
+    </linearGradient>
+    <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#12122a"/>
+      <stop offset="50%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#16162b"/>
+    </linearGradient>
+    <linearGradient id="http-blue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4a9eff"/>
+      <stop offset="100%" stop-color="#2d7dd2"/>
+    </linearGradient>
+    <linearGradient id="tls-green" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2d8a4e"/>
+      <stop offset="100%" stop-color="#1a5c32"/>
+    </linearGradient>
+    <linearGradient id="tls-gold" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1a5c32"/>
+      <stop offset="100%" stop-color="#c9a227"/>
+    </linearGradient>
+    <linearGradient id="forward-http-https" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4a9eff"/>
+      <stop offset="100%" stop-color="#2d8a4e"/>
+    </linearGradient>
+    <linearGradient id="forward-https-http" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2d8a4e"/>
+      <stop offset="100%" stop-color="#4a9eff"/>
+    </linearGradient>
+    <linearGradient id="shunt-tcp" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00d4ff"/>
+      <stop offset="100%" stop-color="#888"/>
+    </linearGradient>
+    <linearGradient id="shunt-unix" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00d4ff"/>
+      <stop offset="100%" stop-color="#9b59b6"/>
+    </linearGradient>
+    <linearGradient id="shunt-tls" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00d4ff"/>
+      <stop offset="100%" stop-color="#2d8a4e"/>
+    </linearGradient>
+    <radialGradient id="station-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#00d4ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="signal-box-bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#2a2a4a"/>
+      <stop offset="100%" stop-color="#1e1e38"/>
+    </linearGradient>
+
+    <!-- Track Sleeper Pattern -->
+    <pattern id="sleepers" x="0" y="0" width="20" height="12" patternUnits="userSpaceOnUse">
+      <rect x="8" y="0" width="4" height="12" rx="1" fill="#3a3a5a" opacity="0.6"/>
+    </pattern>
+
+    <!-- Chevron markers for flow direction -->
+    <marker id="chevron" markerWidth="8" markerHeight="6" refX="4" refY="3" orient="auto">
+      <path d="M0,0 L4,3 L0,6" fill="none" stroke="#00d4ff" stroke-width="1.2" opacity="0.7"/>
+    </marker>
+    <marker id="chevron-amber" markerWidth="8" markerHeight="6" refX="4" refY="3" orient="auto">
+      <path d="M0,0 L4,3 L0,6" fill="none" stroke="#ffa500" stroke-width="1.2" opacity="0.7"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="800" fill="url(#bg-gradient)"/>
+
+  <!-- Subtle grid pattern -->
+  <g opacity="0.04">
+    <line x1="0" y1="0" x2="0" y2="800" stroke="#00d4ff" stroke-width="0.5"/>
+    <line x1="100" y1="0" x2="100" y2="800" stroke="#00d4ff" stroke-width="0.5"/>
+    <line x1="200" y1="0" x2="200" y2="800" stroke="#00d4ff" stroke-width="0.5"/>
+    <line x1="300" y1="0" x2="300" y2="800" stroke="#00d4ff" stroke-width="0.5"/>
+    <line x1="400" y1="0" x2="400" y2="800" stroke="#00d4ff" stroke-width="0.5"/>
+    <line x1="500" y1="0" x2="500" y2="800" stroke="#00d4ff" stroke-width="0.5"/>
+    <line x1="600" y1="0" x2="600" y2="800" stroke="#00d4ff" stroke-width="0.5"/>
+    <line x1="700" y1="0" x2="700" y2="800" stroke="#00d4ff" stroke-width="0.5"/>
+    <line x1="800" y1="0" x2="800" y2="800" stroke="#00d4ff" stroke-width="0.5"/>
+    <line x1="900" y1="0" x2="900" y2="800" stroke="#00d4ff" stroke-width="0.5"/>
+    <line x1="1000" y1="0" x2="1000" y2="800" stroke="#00d4ff" stroke-width="0.5"/>
+    <line x1="1100" y1="0" x2="1100" y2="800" stroke="#00d4ff" stroke-width="0.5"/>
+    <line x1="0" y1="100" x2="1200" y2="100" stroke="#00d4ff" stroke-width="0.5"/>
+    <line x1="0" y1="200" x2="1200" y2="200" stroke="#00d4ff" stroke-width="0.5"/>
+    <line x1="0" y1="300" x2="1200" y2="300" stroke="#00d4ff" stroke-width="0.5"/>
+    <line x1="0" y1="400" x2="1200" y2="400" stroke="#00d4ff" stroke-width="0.5"/>
+    <line x1="0" y1="500" x2="1200" y2="500" stroke="#00d4ff" stroke-width="0.5"/>
+    <line x1="0" y1="600" x2="1200" y2="600" stroke="#00d4ff" stroke-width="0.5"/>
+    <line x1="0" y1="700" x2="1200" y2="700" stroke="#00d4ff" stroke-width="0.5"/>
+  </g>
+
+  <!-- Title -->
+  <text x="600" y="32" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#00d4ff" text-anchor="middle" letter-spacing="8" opacity="0.5" font-weight="300">R A I L S C A L E</text>
+
+  <!-- ==================== -->
+  <!-- SIGNAL BOX / COUPLER -->
+  <!-- ==================== -->
+  <g transform="translate(300, 52)" filter="url(#shadow)">
+    <!-- Signal box structure -->
+    <rect x="0" y="0" width="600" height="105" rx="6" fill="url(#signal-box-bg)" stroke="#ffa500" stroke-width="1.5" opacity="0.95"/>
+    <rect x="0" y="0" width="600" height="22" rx="6" fill="#ffa500" opacity="0.15"/>
+    <rect x="0" y="16" width="600" height="6" fill="#ffa500" opacity="0.15"/>
+    <!-- Roof ornament -->
+    <line x1="0" y1="0" x2="600" y2="0" stroke="#ffa500" stroke-width="2" filter="url(#glow-amber)"/>
+
+    <!-- Title -->
+    <text x="300" y="16" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#ffa500" text-anchor="middle" font-weight="600" letter-spacing="3">COUPLER  -  MASTER SIGNAL BOX</text>
+
+    <!-- Levers -->
+    <!-- ForwardHttp -->
+    <g transform="translate(30, 36)">
+      <rect x="0" y="0" width="75" height="55" rx="3" fill="#1a1a3a" stroke="#4a9eff" stroke-width="1" opacity="0.8"/>
+      <rect x="5" y="5" width="65" height="8" rx="2" fill="#4a9eff" opacity="0.3"/>
+      <rect x="30" y="5" width="15" height="8" rx="2" fill="#4a9eff"/>
+      <circle cx="37" cy="9" r="2" fill="#fff" opacity="0.8"/>
+      <text x="37" y="28" font-family="'Courier New', monospace" font-size="7.5" fill="#4a9eff" text-anchor="middle" font-weight="700">ForwardHttp</text>
+      <text x="37" y="40" font-family="'Segoe UI', sans-serif" font-size="6" fill="#667" text-anchor="middle">HTTP -> HTTP</text>
+      <!-- Signal light -->
+      <circle cx="37" cy="49" r="3" fill="#4a9eff" opacity="0.6" filter="url(#glow-soft)"/>
+    </g>
+
+    <!-- ForwardHttps -->
+    <g transform="translate(120, 36)">
+      <rect x="0" y="0" width="75" height="55" rx="3" fill="#1a1a3a" stroke="#2d8a4e" stroke-width="1" opacity="0.8"/>
+      <rect x="5" y="5" width="65" height="8" rx="2" fill="#2d8a4e" opacity="0.3"/>
+      <rect x="30" y="5" width="15" height="8" rx="2" fill="#2d8a4e"/>
+      <text x="14" y="11" font-family="sans-serif" font-size="5" fill="#c9a227">&#x1F512;</text>
+      <text x="37" y="28" font-family="'Courier New', monospace" font-size="7" fill="#2d8a4e" text-anchor="middle" font-weight="700">ForwardHttps</text>
+      <text x="37" y="40" font-family="'Segoe UI', sans-serif" font-size="6" fill="#667" text-anchor="middle">HTTPS -> HTTPS</text>
+      <circle cx="37" cy="49" r="3" fill="#2d8a4e" opacity="0.6" filter="url(#glow-soft)"/>
+    </g>
+
+    <!-- ForwardTls -->
+    <g transform="translate(210, 36)">
+      <rect x="0" y="0" width="75" height="55" rx="3" fill="#1a1a3a" stroke="#1a5c32" stroke-width="1" opacity="0.8"/>
+      <rect x="5" y="5" width="65" height="8" rx="2" fill="#1a5c32" opacity="0.3"/>
+      <rect x="30" y="5" width="15" height="8" rx="2" fill="#1a5c32"/>
+      <text x="37" y="28" font-family="'Courier New', monospace" font-size="7.5" fill="#1a8c42" text-anchor="middle" font-weight="700">ForwardTls</text>
+      <text x="37" y="40" font-family="'Segoe UI', sans-serif" font-size="6" fill="#667" text-anchor="middle">TLS -> TLS</text>
+      <circle cx="37" cy="49" r="3" fill="#1a5c32" opacity="0.6" filter="url(#glow-soft)"/>
+    </g>
+
+    <!-- ForwardTcp -->
+    <g transform="translate(300, 36)">
+      <rect x="0" y="0" width="75" height="55" rx="3" fill="#1a1a3a" stroke="#888" stroke-width="1" opacity="0.8"/>
+      <rect x="5" y="5" width="65" height="8" rx="2" fill="#888" opacity="0.2"/>
+      <rect x="30" y="5" width="15" height="8" rx="2" fill="#888"/>
+      <text x="37" y="28" font-family="'Courier New', monospace" font-size="7.5" fill="#aaa" text-anchor="middle" font-weight="700">ForwardTcp</text>
+      <text x="37" y="40" font-family="'Segoe UI', sans-serif" font-size="6" fill="#667" text-anchor="middle">TCP -> TCP</text>
+      <circle cx="37" cy="49" r="3" fill="#888" opacity="0.4" filter="url(#glow-soft)"/>
+    </g>
+
+    <!-- ForwardHttpToHttps -->
+    <g transform="translate(390, 36)">
+      <rect x="0" y="0" width="90" height="55" rx="3" fill="#1a1a3a" stroke="#3d94c8" stroke-width="1" opacity="0.8"/>
+      <rect x="5" y="5" width="80" height="8" rx="2" fill="url(#forward-http-https)" opacity="0.4"/>
+      <rect x="35" y="5" width="18" height="8" rx="2" fill="url(#forward-http-https)"/>
+      <text x="45" y="28" font-family="'Courier New', monospace" font-size="6.5" fill="#5aafdf" text-anchor="middle" font-weight="700">ForwardHttpToHttps</text>
+      <text x="45" y="40" font-family="'Segoe UI', sans-serif" font-size="6" fill="#667" text-anchor="middle">HTTP -> HTTPS</text>
+      <circle cx="35" cy="49" r="3" fill="#4a9eff" opacity="0.5"/>
+      <circle cx="55" cy="49" r="3" fill="#2d8a4e" opacity="0.5"/>
+      <line x1="38" y1="49" x2="52" y2="49" stroke="#5a8" stroke-width="0.5" opacity="0.5"/>
+    </g>
+
+    <!-- ForwardHttpsToHttp -->
+    <g transform="translate(495, 36)">
+      <rect x="0" y="0" width="90" height="55" rx="3" fill="#1a1a3a" stroke="#3d94c8" stroke-width="1" opacity="0.8"/>
+      <rect x="5" y="5" width="80" height="8" rx="2" fill="url(#forward-https-http)" opacity="0.4"/>
+      <rect x="35" y="5" width="18" height="8" rx="2" fill="url(#forward-https-http)"/>
+      <text x="45" y="28" font-family="'Courier New', monospace" font-size="6.5" fill="#5aafdf" text-anchor="middle" font-weight="700">ForwardHttpsToHttp</text>
+      <text x="45" y="40" font-family="'Segoe UI', sans-serif" font-size="6" fill="#667" text-anchor="middle">HTTPS -> HTTP</text>
+      <circle cx="35" cy="49" r="3" fill="#2d8a4e" opacity="0.5"/>
+      <circle cx="55" cy="49" r="3" fill="#4a9eff" opacity="0.5"/>
+      <line x1="38" y1="49" x2="52" y2="49" stroke="#5a8" stroke-width="0.5" opacity="0.5"/>
+    </g>
+
+    <!-- Connecting wires down to tracks -->
+    <line x1="100" y1="105" x2="100" y2="130" stroke="#ffa500" stroke-width="0.8" stroke-dasharray="3,3" opacity="0.4"/>
+    <line x1="300" y1="105" x2="300" y2="130" stroke="#ffa500" stroke-width="0.8" stroke-dasharray="3,3" opacity="0.4"/>
+    <line x1="500" y1="105" x2="500" y2="130" stroke="#ffa500" stroke-width="0.8" stroke-dasharray="3,3" opacity="0.4"/>
+  </g>
+
+  <!-- Conductor character -->
+  <g transform="translate(250, 78)">
+    <!-- Hat -->
+    <rect x="-8" y="-8" width="16" height="5" rx="2" fill="#ffa500" opacity="0.8"/>
+    <rect x="-12" y="-3" width="24" height="3" rx="1" fill="#ffa500" opacity="0.6"/>
+    <!-- Head -->
+    <circle cx="0" cy="6" r="7" fill="#e8c59a" opacity="0.8"/>
+    <!-- Eyes -->
+    <circle cx="-2.5" cy="5" r="1" fill="#1a1a2e"/>
+    <circle cx="2.5" cy="5" r="1" fill="#1a1a2e"/>
+    <!-- Body -->
+    <rect x="-6" y="13" width="12" height="14" rx="2" fill="#2a2a5a" stroke="#ffa500" stroke-width="0.5"/>
+    <text x="0" y="24" font-family="sans-serif" font-size="4" fill="#ffa500" text-anchor="middle">C</text>
+    <!-- Label -->
+    <text x="0" y="38" font-family="'Courier New', monospace" font-size="6" fill="#ffa500" text-anchor="middle" opacity="0.7">conductor</text>
+  </g>
+
+  <!-- ========================= -->
+  <!-- MAIN TRACK / PIPELINE     -->
+  <!-- ========================= -->
+
+  <!-- Track bed (sleepers) -->
+  <rect x="30" y="404" width="900" height="12" fill="url(#sleepers)" opacity="0.5"/>
+
+  <!-- Main rails - double line with glow -->
+  <g filter="url(#glow-cyan)">
+    <line x1="30" y1="405" x2="930" y2="405" stroke="#00d4ff" stroke-width="2.5" opacity="0.8"/>
+    <line x1="30" y1="415" x2="930" y2="415" stroke="#00d4ff" stroke-width="2.5" opacity="0.8"/>
+  </g>
+  <!-- Rail highlight -->
+  <line x1="30" y1="404" x2="930" y2="404" stroke="#fff" stroke-width="0.5" opacity="0.2"/>
+  <line x1="30" y1="414" x2="930" y2="414" stroke="#fff" stroke-width="0.5" opacity="0.2"/>
+
+  <!-- Flow chevrons along main track -->
+  <g opacity="0.5">
+    <path d="M80,410 L88,405 L80,400" fill="none" stroke="#00d4ff" stroke-width="1.2"/>
+    <path d="M160,410 L168,405 L160,400" fill="none" stroke="#00d4ff" stroke-width="1.2"/>
+    <path d="M280,410 L288,405 L280,400" fill="none" stroke="#00d4ff" stroke-width="1.2"/>
+    <path d="M420,410 L428,405 L420,400" fill="none" stroke="#00d4ff" stroke-width="1.2"/>
+    <path d="M560,410 L568,405 L560,400" fill="none" stroke="#00d4ff" stroke-width="1.2"/>
+    <path d="M700,410 L708,405 L700,400" fill="none" stroke="#00d4ff" stroke-width="1.2"/>
+    <path d="M820,410 L828,405 L820,400" fill="none" stroke="#00d4ff" stroke-width="1.2"/>
+  </g>
+
+  <!-- Pipeline label -->
+  <text x="480" y="440" font-family="'Segoe UI', sans-serif" font-size="9" fill="#00d4ff" text-anchor="middle" opacity="0.4" letter-spacing="6">THE  PIPELINE</text>
+
+  <!-- ======================= -->
+  <!-- STATION 1: SOURCE       -->
+  <!-- ======================= -->
+  <g transform="translate(70, 340)">
+    <!-- Station glow -->
+    <ellipse cx="0" cy="35" rx="60" ry="50" fill="url(#station-glow)"/>
+
+    <!-- Grand terminal building -->
+    <rect x="-50" y="-20" width="100" height="55" rx="4" fill="#1e1e38" stroke="#00d4ff" stroke-width="1.5"/>
+    <!-- Roof -->
+    <path d="M-55,-20 L0,-40 L55,-20" fill="#1e1e38" stroke="#00d4ff" stroke-width="1.5"/>
+    <!-- Arch entrance -->
+    <path d="M-15,35 L-15,15 Q-15,5 0,5 Q15,5 15,15 L15,35" fill="none" stroke="#00d4ff" stroke-width="1" opacity="0.6"/>
+    <!-- Windows -->
+    <rect x="-40" y="-10" width="12" height="10" rx="1" fill="#00d4ff" opacity="0.1" stroke="#00d4ff" stroke-width="0.5"/>
+    <rect x="-22" y="-10" width="12" height="10" rx="1" fill="#00d4ff" opacity="0.1" stroke="#00d4ff" stroke-width="0.5"/>
+    <rect x="10" y="-10" width="12" height="10" rx="1" fill="#00d4ff" opacity="0.1" stroke="#00d4ff" stroke-width="0.5"/>
+    <rect x="28" y="-10" width="12" height="10" rx="1" fill="#00d4ff" opacity="0.1" stroke="#00d4ff" stroke-width="0.5"/>
+
+    <!-- Station name -->
+    <text x="0" y="-26" font-family="'Segoe UI', sans-serif" font-size="8" fill="#00d4ff" text-anchor="middle" font-weight="700" filter="url(#glow-cyan)">SOURCE STATION</text>
+    <text x="0" y="8" font-family="'Courier New', monospace" font-size="9" fill="#fff" text-anchor="middle" font-weight="700">StreamSource</text>
+
+    <!-- Platform signs -->
+    <!-- TcpSource platform -->
+    <g transform="translate(-30, 42)">
+      <rect x="-22" y="0" width="44" height="14" rx="2" fill="#2a2a4a" stroke="#888" stroke-width="0.8"/>
+      <text x="0" y="10" font-family="'Courier New', monospace" font-size="6.5" fill="#aaa" text-anchor="middle">TcpSource</text>
+      <text x="0" y="22" font-family="sans-serif" font-size="5" fill="#667" text-anchor="middle">Platform 1</text>
+    </g>
+    <!-- TlsSource platform (fortified) -->
+    <g transform="translate(30, 42)">
+      <rect x="-22" y="0" width="44" height="14" rx="2" fill="#1a3a2a" stroke="#2d8a4e" stroke-width="1"/>
+      <text x="-14" y="10" font-family="'Courier New', monospace" font-size="6.5" fill="#4ade80" text-anchor="start">TlsSource</text>
+      <!-- Lock icon -->
+      <rect x="14" y="3" width="5" height="5" rx="1" fill="#c9a227" opacity="0.8"/>
+      <path d="M15,4 L15,2 Q16.5,0 18,2 L18,4" fill="none" stroke="#c9a227" stroke-width="0.8"/>
+      <text x="0" y="22" font-family="sans-serif" font-size="5" fill="#4a7" text-anchor="middle">Platform 2 (Secured)</text>
+    </g>
+
+    <!-- Signal light -->
+    <g transform="translate(55, -15)">
+      <rect x="-3" y="0" width="6" height="18" rx="2" fill="#2a2a4a" stroke="#444" stroke-width="0.5"/>
+      <circle cx="0" cy="5" r="2.5" fill="#ff4444" opacity="0.8" filter="url(#glow-soft)"/>
+      <circle cx="0" cy="13" r="2.5" fill="#44ff44" opacity="0.3"/>
+    </g>
+  </g>
+
+  <!-- ======================== -->
+  <!-- STATION 2: PARSER YARD   -->
+  <!-- ======================== -->
+  <g transform="translate(250, 340)">
+    <ellipse cx="0" cy="35" rx="70" ry="50" fill="url(#station-glow)"/>
+
+    <!-- Marshalling yard building -->
+    <rect x="-60" y="-15" width="120" height="50" rx="3" fill="#1e1e38" stroke="#00d4ff" stroke-width="1.2"/>
+    <!-- Sawtooth roof -->
+    <path d="M-60,-15 L-40,-28 L-20,-15 L0,-28 L20,-15 L40,-28 L60,-15" fill="none" stroke="#00d4ff" stroke-width="1.2"/>
+
+    <text x="0" y="-32" font-family="'Segoe UI', sans-serif" font-size="8" fill="#00d4ff" text-anchor="middle" font-weight="700" filter="url(#glow-cyan)">PARSER YARD</text>
+    <text x="0" y="0" font-family="'Courier New', monospace" font-size="9" fill="#fff" text-anchor="middle" font-weight="700">FrameParser</text>
+
+    <!-- Incoming bulk cargo -> sorted boxes -->
+    <!-- Raw cargo (left side) -->
+    <g transform="translate(-40, 8)">
+      <rect x="0" y="0" width="12" height="8" fill="#664" stroke="#885" stroke-width="0.5" transform="rotate(-5)"/>
+      <rect x="5" y="-3" width="10" height="7" fill="#554" stroke="#775" stroke-width="0.5" transform="rotate(8)"/>
+      <text x="8" y="20" font-family="sans-serif" font-size="4.5" fill="#887" text-anchor="middle">raw bytes</text>
+    </g>
+    <!-- Arrow -->
+    <path d="M-15,15 L5,15" fill="none" stroke="#ffa500" stroke-width="1" marker-end="url(#chevron-amber)"/>
+    <!-- Sorted Frame boxes (right side) -->
+    <g transform="translate(15, 6)">
+      <rect x="0" y="0" width="14" height="10" rx="1" fill="#1a2a3a" stroke="#00d4ff" stroke-width="0.8"/>
+      <text x="7" y="7" font-family="monospace" font-size="4" fill="#00d4ff" text-anchor="middle">Frame</text>
+      <rect x="17" y="0" width="14" height="10" rx="1" fill="#1a2a3a" stroke="#00d4ff" stroke-width="0.8"/>
+      <text x="24" y="7" font-family="monospace" font-size="4" fill="#00d4ff" text-anchor="middle">Frame</text>
+    </g>
+
+    <!-- Parser variant signs -->
+    <g transform="translate(-40, 40)">
+      <rect x="-18" y="0" width="36" height="11" rx="2" fill="#2a2a4a" stroke="#557" stroke-width="0.5"/>
+      <text x="0" y="8" font-family="'Courier New', monospace" font-size="5.5" fill="#8af" text-anchor="middle">HttpParser</text>
+    </g>
+    <g transform="translate(0, 40)">
+      <rect x="-16" y="0" width="32" height="11" rx="2" fill="#2a2a4a" stroke="#557" stroke-width="0.5"/>
+      <text x="0" y="8" font-family="'Courier New', monospace" font-size="5.5" fill="#8fa" text-anchor="middle">TlsParser</text>
+    </g>
+    <g transform="translate(40, 40)">
+      <rect x="-18" y="0" width="36" height="11" rx="2" fill="#2a2a4a" stroke="#557" stroke-width="0.5"/>
+      <text x="0" y="8" font-family="'Courier New', monospace" font-size="5.5" fill="#aaa" text-anchor="middle">RawParser</text>
+    </g>
+
+    <!-- Signal light -->
+    <g transform="translate(65, -10)">
+      <rect x="-3" y="0" width="6" height="18" rx="2" fill="#2a2a4a" stroke="#444" stroke-width="0.5"/>
+      <circle cx="0" cy="5" r="2.5" fill="#ff4444" opacity="0.3"/>
+      <circle cx="0" cy="13" r="2.5" fill="#44ff44" opacity="0.8" filter="url(#glow-soft)"/>
+    </g>
+  </g>
+
+  <!-- ========================== -->
+  <!-- STATION 3: TURNOUT JUNCTION -->
+  <!-- ========================== -->
+  <g transform="translate(470, 330)">
+    <ellipse cx="0" cy="45" rx="75" ry="55" fill="url(#station-glow)"/>
+
+    <text x="0" y="-28" font-family="'Segoe UI', sans-serif" font-size="8" fill="#ffa500" text-anchor="middle" font-weight="700" filter="url(#glow-amber)">TURNOUT JUNCTION</text>
+
+    <!-- Junction building -->
+    <rect x="-70" y="-20" width="140" height="55" rx="3" fill="#1e1e38" stroke="#ffa500" stroke-width="1.2"/>
+
+    <text x="0" y="-5" font-family="'Courier New', monospace" font-size="8" fill="#fff" text-anchor="middle" font-weight="700">SwitchRail / Turnout</text>
+
+    <!-- Switch mechanisms -->
+    <!-- SwitchRail - actual switch/points -->
+    <g transform="translate(-45, 5)">
+      <line x1="0" y1="0" x2="20" y2="0" stroke="#ffa500" stroke-width="2"/>
+      <line x1="10" y1="0" x2="25" y2="-8" stroke="#ffa500" stroke-width="2" stroke-dasharray="2,2"/>
+      <circle cx="10" cy="0" r="2.5" fill="#ffa500" opacity="0.8"/>
+      <text x="12" y="14" font-family="'Courier New', monospace" font-size="5.5" fill="#ffa500" text-anchor="middle">SwitchRail</text>
+    </g>
+
+    <!-- SimpleTurnout - simple Y junction -->
+    <g transform="translate(-5, 5)">
+      <line x1="0" y1="0" x2="10" y2="0" stroke="#ffa500" stroke-width="1.5"/>
+      <line x1="10" y1="0" x2="22" y2="-6" stroke="#ffa500" stroke-width="1.5"/>
+      <line x1="10" y1="0" x2="22" y2="6" stroke="#ffa500" stroke-width="1.5"/>
+      <text x="11" y="18" font-family="'Courier New', monospace" font-size="5" fill="#ffa500" text-anchor="middle">SimpleTurnout</text>
+    </g>
+
+    <!-- ShuttleLink - two turnouts connected -->
+    <g transform="translate(35, 2)">
+      <line x1="0" y1="0" x2="8" y2="-4" stroke="#ffa500" stroke-width="1.5"/>
+      <line x1="0" y1="0" x2="8" y2="4" stroke="#ffa500" stroke-width="1.5"/>
+      <line x1="8" y1="-4" x2="18" y2="-4" stroke="#ffa500" stroke-width="1.5" stroke-dasharray="2,1"/>
+      <line x1="8" y1="4" x2="18" y2="4" stroke="#ffa500" stroke-width="1.5" stroke-dasharray="2,1"/>
+      <line x1="18" y1="-4" x2="26" y2="0" stroke="#ffa500" stroke-width="1.5"/>
+      <line x1="18" y1="4" x2="26" y2="0" stroke="#ffa500" stroke-width="1.5"/>
+      <text x="13" y="18" font-family="'Courier New', monospace" font-size="5" fill="#ffa500" text-anchor="middle">ShuttleLink</text>
+    </g>
+
+    <!-- IdentityRail - straight through -->
+    <g transform="translate(-45, 28)">
+      <line x1="0" y1="0" x2="30" y2="0" stroke="#888" stroke-width="2"/>
+      <text x="15" y="12" font-family="'Courier New', monospace" font-size="5" fill="#888" text-anchor="middle">IdentityRail</text>
+      <text x="15" y="19" font-family="sans-serif" font-size="4" fill="#556" text-anchor="middle">(passthrough)</text>
+    </g>
+  </g>
+
+  <!-- ========================== -->
+  <!-- STATION 4: SHUNTING YARD    -->
+  <!-- ========================== -->
+  <g transform="translate(720, 310)">
+    <text x="0" y="-30" font-family="'Segoe UI', sans-serif" font-size="8" fill="#00d4ff" text-anchor="middle" font-weight="700" filter="url(#glow-cyan)">SHUNTING YARD</text>
+    <text x="0" y="-18" font-family="'Courier New', monospace" font-size="7" fill="#fff" text-anchor="middle">Shunt / RouterShunt</text>
+
+    <!-- Fan-shaped yard structure -->
+    <path d="M-30,95 L-30,60 Q-30,30 10,10" fill="none" stroke="#00d4ff" stroke-width="1" opacity="0.3"/>
+
+    <!-- Three outbound tracks fanning out -->
+    <!-- Track 1: OverTcp (top) -->
+    <g>
+      <path d="M-30,90 Q40,50 180,30" fill="none" stroke="url(#shunt-tcp)" stroke-width="2.5" filter="url(#glow-cyan)"/>
+      <path d="M-30,98 Q40,58 180,38" fill="none" stroke="url(#shunt-tcp)" stroke-width="2.5" filter="url(#glow-cyan)"/>
+      <!-- Sleepers -->
+      <line x1="20" y1="58" x2="25" y2="48" stroke="#3a3a5a" stroke-width="3" opacity="0.4"/>
+      <line x1="50" y1="52" x2="55" y2="42" stroke="#3a3a5a" stroke-width="3" opacity="0.4"/>
+      <line x1="80" y1="48" x2="84" y2="38" stroke="#3a3a5a" stroke-width="3" opacity="0.4"/>
+      <line x1="110" y1="43" x2="114" y2="33" stroke="#3a3a5a" stroke-width="3" opacity="0.4"/>
+      <line x1="140" y1="39" x2="143" y2="29" stroke="#3a3a5a" stroke-width="3" opacity="0.4"/>
+      <!-- Chevrons -->
+      <path d="M80,40 L88,36 L80,32" fill="none" stroke="#aaa" stroke-width="1" opacity="0.5"/>
+      <path d="M130,33 L138,30 L130,27" fill="none" stroke="#aaa" stroke-width="1" opacity="0.5"/>
+      <!-- Destination: TCP City -->
+      <g transform="translate(195, 25)">
+        <rect x="-20" y="-12" width="70" height="30" rx="4" fill="#1e1e38" stroke="#888" stroke-width="1.2"/>
+        <text x="15" y="-2" font-family="'Courier New', monospace" font-size="6" fill="#aaa" text-anchor="middle">OverTcp</text>
+        <text x="15" y="10" font-family="'Segoe UI', sans-serif" font-size="7" fill="#ccc" text-anchor="middle" font-weight="600">TCP City</text>
+        <!-- Small buildings -->
+        <rect x="38" y="-5" width="6" height="12" fill="#3a3a5a" stroke="#666" stroke-width="0.5"/>
+        <rect x="46" y="-8" width="5" height="15" fill="#3a3a5a" stroke="#666" stroke-width="0.5"/>
+      </g>
+    </g>
+
+    <!-- Track 2: OverUnix (middle - underground) -->
+    <g>
+      <path d="M-30,90 Q60,90 180,90" fill="none" stroke="url(#shunt-unix)" stroke-width="2.5" filter="url(#glow-cyan)"/>
+      <path d="M-30,98 Q60,98 180,98" fill="none" stroke="url(#shunt-unix)" stroke-width="2.5" filter="url(#glow-cyan)"/>
+      <!-- Tunnel entrance -->
+      <path d="M100,78 Q115,68 130,78 L130,108 Q115,118 100,108 Z" fill="#1a1a2e" stroke="#9b59b6" stroke-width="1.2"/>
+      <path d="M103,80 Q115,72 127,80" fill="none" stroke="#9b59b6" stroke-width="0.8"/>
+      <!-- Dashed track inside tunnel -->
+      <line x1="130" y1="90" x2="180" y2="90" stroke="#9b59b6" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <line x1="130" y1="98" x2="180" y2="98" stroke="#9b59b6" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <!-- Destination -->
+      <g transform="translate(195, 85)">
+        <rect x="-20" y="-12" width="85" height="30" rx="4" fill="#1a1a2e" stroke="#9b59b6" stroke-width="1.2"/>
+        <text x="22" y="-2" font-family="'Courier New', monospace" font-size="6" fill="#9b59b6" text-anchor="middle">OverUnix</text>
+        <text x="22" y="10" font-family="'Segoe UI', sans-serif" font-size="6.5" fill="#c084fc" text-anchor="middle" font-weight="600">Unix Socket Tunnel</text>
+      </g>
+    </g>
+
+    <!-- Track 3: OverTls (bottom - armored) -->
+    <g>
+      <path d="M-30,90 Q40,130 180,155" fill="none" stroke="url(#shunt-tls)" stroke-width="2.5" filter="url(#glow-cyan)"/>
+      <path d="M-30,98 Q40,138 180,163" fill="none" stroke="url(#shunt-tls)" stroke-width="2.5" filter="url(#glow-cyan)"/>
+      <!-- Shield icons along track -->
+      <g transform="translate(60, 120)" opacity="0.6">
+        <path d="M0,-4 L4,0 L0,6 L-4,0 Z" fill="none" stroke="#2d8a4e" stroke-width="0.8"/>
+      </g>
+      <g transform="translate(110, 140)" opacity="0.6">
+        <path d="M0,-4 L4,0 L0,6 L-4,0 Z" fill="none" stroke="#2d8a4e" stroke-width="0.8"/>
+      </g>
+      <!-- Chevrons -->
+      <path d="M90,130 L98,133 L90,136" fill="none" stroke="#2d8a4e" stroke-width="1" opacity="0.5"/>
+      <!-- Destination: TLS Fortress -->
+      <g transform="translate(195, 150)">
+        <rect x="-20" y="-12" width="75" height="30" rx="4" fill="#1a2a1e" stroke="#2d8a4e" stroke-width="1.5"/>
+        <!-- Battlements -->
+        <path d="M-20,-12 L-20,-18 L-14,-18 L-14,-12 M-8,-12 L-8,-18 L-2,-18 L-2,-12 M4,-12 L4,-18 L10,-18 L10,-12 M16,-12 L16,-18 L22,-18 L22,-12 M28,-12 L28,-18 L34,-18 L34,-12 M40,-12 L40,-18 L46,-18 L46,-12" fill="none" stroke="#2d8a4e" stroke-width="0.8"/>
+        <text x="17" y="-1" font-family="'Courier New', monospace" font-size="6" fill="#4ade80" text-anchor="middle">OverTls</text>
+        <text x="17" y="11" font-family="'Segoe UI', sans-serif" font-size="7" fill="#4ade80" text-anchor="middle" font-weight="600">TLS Fortress</text>
+        <!-- Lock -->
+        <rect x="42" y="0" width="7" height="7" rx="1.5" fill="#c9a227" opacity="0.7"/>
+        <path d="M43.5,1 L43.5,-1.5 Q45.5,-4 47.5,-1.5 L47.5,1" fill="none" stroke="#c9a227" stroke-width="1"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- ============================== -->
+  <!-- STATION 5: DEPARTURE PLATFORM  -->
+  <!-- ============================== -->
+  <g transform="translate(900, 355)">
+    <text x="20" y="-18" font-family="'Segoe UI', sans-serif" font-size="7" fill="#00d4ff" text-anchor="middle" font-weight="700" filter="url(#glow-cyan)">DEPARTURE</text>
+
+    <!-- Departure board -->
+    <rect x="-20" y="-10" width="80" height="35" rx="3" fill="#1e1e38" stroke="#00d4ff" stroke-width="1"/>
+    <rect x="-16" y="-6" width="72" height="10" rx="1" fill="#0a0a1a"/>
+    <text x="20" y="1" font-family="'Courier New', monospace" font-size="6" fill="#00ff88" text-anchor="middle">StreamDeparture</text>
+    <rect x="-16" y="8" width="72" height="10" rx="1" fill="#0a0a1a"/>
+    <text x="20" y="15" font-family="'Courier New', monospace" font-size="5.5" fill="#ffaa00" text-anchor="middle">StreamDestination</text>
+
+    <!-- Arrow out -->
+    <path d="M65,10 L85,10" fill="none" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#chevron)"/>
+    <text x="100" y="13" font-family="sans-serif" font-size="5" fill="#00d4ff" opacity="0.6">OUT</text>
+
+    <!-- Signal light green -->
+    <g transform="translate(-28, -5)">
+      <rect x="-3" y="0" width="6" height="18" rx="2" fill="#2a2a4a" stroke="#444" stroke-width="0.5"/>
+      <circle cx="0" cy="5" r="2.5" fill="#ff4444" opacity="0.3"/>
+      <circle cx="0" cy="13" r="2.5" fill="#44ff44" opacity="0.8" filter="url(#glow-soft)"/>
+    </g>
+  </g>
+
+  <!-- ======================== -->
+  <!-- CARRIAGES ON THE TRACKS  -->
+  <!-- ======================== -->
+
+  <!-- HTTP Carriage (blue) -->
+  <g transform="translate(155, 445)">
+    <!-- Carriage body -->
+    <rect x="0" y="0" width="110" height="45" rx="5" fill="url(#http-blue)" stroke="#6ab8ff" stroke-width="1.2" filter="url(#shadow)"/>
+    <!-- Windows -->
+    <rect x="8" y="6" width="14" height="10" rx="2" fill="#1a3a5a" stroke="#8ac" stroke-width="0.5"/>
+    <rect x="26" y="6" width="14" height="10" rx="2" fill="#1a3a5a" stroke="#8ac" stroke-width="0.5"/>
+    <rect x="44" y="6" width="14" height="10" rx="2" fill="#1a3a5a" stroke="#8ac" stroke-width="0.5"/>
+    <rect x="62" y="6" width="14" height="10" rx="2" fill="#1a3a5a" stroke="#8ac" stroke-width="0.5"/>
+    <!-- HttpFrame cargo visible in windows -->
+    <rect x="10" y="8" width="10" height="6" rx="1" fill="#4a9eff" opacity="0.3"/>
+    <rect x="28" y="8" width="10" height="6" rx="1" fill="#4a9eff" opacity="0.3"/>
+    <text x="15" y="13" font-family="monospace" font-size="3.5" fill="#8cf">HF</text>
+    <text x="33" y="13" font-family="monospace" font-size="3.5" fill="#8cf">HF</text>
+    <!-- Label -->
+    <text x="55" y="30" font-family="'Segoe UI', sans-serif" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">HTTP/1.1</text>
+    <text x="55" y="40" font-family="'Courier New', monospace" font-size="5.5" fill="#8ac" text-anchor="middle">carriage</text>
+    <!-- Stripe -->
+    <line x1="5" y1="22" x2="105" y2="22" stroke="#fff" stroke-width="0.5" opacity="0.15"/>
+    <!-- Processing unit label -->
+    <rect x="80" y="7" width="24" height="8" rx="1" fill="#1a3a5a" stroke="#4a9eff" stroke-width="0.5"/>
+    <text x="92" y="13" font-family="monospace" font-size="3.5" fill="#4a9eff" text-anchor="middle">Pipeline</text>
+
+    <!-- Wheels/bogies -->
+    <g transform="translate(18, 45)">
+      <rect x="-10" y="0" width="20" height="8" rx="2" fill="#2a2a4a" stroke="#555" stroke-width="0.5"/>
+      <circle cx="-5" cy="8" r="4" fill="#3a3a4a" stroke="#666" stroke-width="1"/>
+      <circle cx="-5" cy="8" r="1.5" fill="#555"/>
+      <circle cx="5" cy="8" r="4" fill="#3a3a4a" stroke="#666" stroke-width="1"/>
+      <circle cx="5" cy="8" r="1.5" fill="#555"/>
+      <text x="0" y="19" font-family="monospace" font-size="4" fill="#556" text-anchor="middle">bogie</text>
+    </g>
+    <g transform="translate(82, 45)">
+      <rect x="-10" y="0" width="20" height="8" rx="2" fill="#2a2a4a" stroke="#555" stroke-width="0.5"/>
+      <circle cx="-5" cy="8" r="4" fill="#3a3a4a" stroke="#666" stroke-width="1"/>
+      <circle cx="-5" cy="8" r="1.5" fill="#555"/>
+      <circle cx="5" cy="8" r="4" fill="#3a3a4a" stroke="#666" stroke-width="1"/>
+      <circle cx="5" cy="8" r="1.5" fill="#555"/>
+    </g>
+
+    <!-- HttpTurnout nearby -->
+    <g transform="translate(115, 15)">
+      <line x1="0" y1="0" x2="12" y2="0" stroke="#4a9eff" stroke-width="1.5"/>
+      <line x1="12" y1="0" x2="20" y2="-6" stroke="#4a9eff" stroke-width="1.5"/>
+      <line x1="12" y1="0" x2="20" y2="6" stroke="#4a9eff" stroke-width="1.5"/>
+      <text x="10" y="16" font-family="monospace" font-size="4.5" fill="#4a9eff" text-anchor="middle">HttpTurnout</text>
+    </g>
+  </g>
+
+  <!-- TLS Carriage (armored vault car) -->
+  <g transform="translate(340, 445)">
+    <!-- Armored body -->
+    <rect x="0" y="0" width="120" height="45" rx="4" fill="url(#tls-green)" stroke="#c9a227" stroke-width="1.5" filter="url(#shadow)"/>
+    <!-- Rivets/armor plating -->
+    <circle cx="8" cy="8" r="1.5" fill="#c9a227" opacity="0.4"/>
+    <circle cx="112" cy="8" r="1.5" fill="#c9a227" opacity="0.4"/>
+    <circle cx="8" cy="37" r="1.5" fill="#c9a227" opacity="0.4"/>
+    <circle cx="112" cy="37" r="1.5" fill="#c9a227" opacity="0.4"/>
+    <!-- Lock symbols -->
+    <g transform="translate(15, 12)">
+      <rect x="0" y="0" width="8" height="8" rx="2" fill="#c9a227" opacity="0.6"/>
+      <path d="M1,-1 L1,-3 Q4,-6 7,-3 L7,-1" fill="none" stroke="#c9a227" stroke-width="1"/>
+    </g>
+    <g transform="translate(97, 12)">
+      <rect x="0" y="0" width="8" height="8" rx="2" fill="#c9a227" opacity="0.6"/>
+      <path d="M1,-1 L1,-3 Q4,-6 7,-3 L7,-1" fill="none" stroke="#c9a227" stroke-width="1"/>
+    </g>
+    <!-- TlsFrame locked cargo -->
+    <rect x="30" y="6" width="16" height="12" rx="1" fill="#1a3a2a" stroke="#4ade80" stroke-width="0.5"/>
+    <text x="38" y="14" font-family="monospace" font-size="3.5" fill="#4ade80" text-anchor="middle">TlsF</text>
+    <rect x="50" y="6" width="16" height="12" rx="1" fill="#1a3a2a" stroke="#4ade80" stroke-width="0.5"/>
+    <text x="58" y="14" font-family="monospace" font-size="3.5" fill="#4ade80" text-anchor="middle">TlsF</text>
+    <rect x="70" y="6" width="16" height="12" rx="1" fill="#1a3a2a" stroke="#4ade80" stroke-width="0.5"/>
+    <text x="78" y="14" font-family="monospace" font-size="3.5" fill="#4ade80" text-anchor="middle">TlsF</text>
+    <!-- Label -->
+    <text x="60" y="32" font-family="'Segoe UI', sans-serif" font-size="12" fill="#c9a227" text-anchor="middle" font-weight="700">TLS</text>
+    <text x="60" y="42" font-family="'Courier New', monospace" font-size="5" fill="#4a7" text-anchor="middle">trezorcarriage</text>
+    <!-- Gold stripe -->
+    <line x1="5" y1="22" x2="115" y2="22" stroke="#c9a227" stroke-width="0.8" opacity="0.3"/>
+
+    <!-- Wheels -->
+    <g transform="translate(22, 45)">
+      <rect x="-10" y="0" width="20" height="8" rx="2" fill="#2a2a4a" stroke="#555" stroke-width="0.5"/>
+      <circle cx="-5" cy="8" r="4" fill="#3a3a4a" stroke="#666" stroke-width="1"/>
+      <circle cx="-5" cy="8" r="1.5" fill="#555"/>
+      <circle cx="5" cy="8" r="4" fill="#3a3a4a" stroke="#666" stroke-width="1"/>
+      <circle cx="5" cy="8" r="1.5" fill="#555"/>
+    </g>
+    <g transform="translate(98, 45)">
+      <rect x="-10" y="0" width="20" height="8" rx="2" fill="#2a2a4a" stroke="#555" stroke-width="0.5"/>
+      <circle cx="-5" cy="8" r="4" fill="#3a3a4a" stroke="#666" stroke-width="1"/>
+      <circle cx="-5" cy="8" r="1.5" fill="#555"/>
+      <circle cx="5" cy="8" r="4" fill="#3a3a4a" stroke="#666" stroke-width="1"/>
+      <circle cx="5" cy="8" r="1.5" fill="#555"/>
+    </g>
+
+    <!-- TLS bypass/termination tracks below -->
+    <g transform="translate(0, 68)">
+      <!-- TlsPassthroughTurnout -->
+      <line x1="10" y1="0" x2="50" y2="0" stroke="#2d8a4e" stroke-width="1.5" stroke-dasharray="4,2"/>
+      <text x="30" y="10" font-family="monospace" font-size="4.5" fill="#4a7" text-anchor="middle">TlsPassthroughTurnout</text>
+      <!-- TlsTerminationRail -->
+      <g transform="translate(65, -5)">
+        <line x1="0" y1="5" x2="45" y2="5" stroke="#c9a227" stroke-width="1.5"/>
+        <!-- Decryption station icon -->
+        <rect x="15" y="0" width="14" height="10" rx="2" fill="#1a3a2a" stroke="#c9a227" stroke-width="0.8"/>
+        <text x="22" y="7" font-family="monospace" font-size="4" fill="#c9a227" text-anchor="middle">DEC</text>
+        <text x="22" y="20" font-family="monospace" font-size="4.5" fill="#c9a227" text-anchor="middle">TlsTerminationRail</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Raw Freight Car -->
+  <g transform="translate(530, 452)">
+    <!-- Open-top freight car -->
+    <rect x="0" y="0" width="70" height="35" rx="2" fill="#4a3a2a" stroke="#7a6a4a" stroke-width="1" filter="url(#shadow)"/>
+    <!-- Wood planks -->
+    <line x1="0" y1="7" x2="70" y2="7" stroke="#5a4a3a" stroke-width="0.5"/>
+    <line x1="0" y1="14" x2="70" y2="14" stroke="#5a4a3a" stroke-width="0.5"/>
+    <line x1="0" y1="21" x2="70" y2="21" stroke="#5a4a3a" stroke-width="0.5"/>
+    <!-- Coal/ore (raw bytes) heaped on top -->
+    <path d="M5,-2 Q12,-10 20,-5 Q28,-12 38,-4 Q48,-11 55,-6 Q62,-10 65,-2" fill="#3a3a4a" stroke="#555" stroke-width="0.5"/>
+    <!-- Label -->
+    <text x="35" y="18" font-family="'Segoe UI', sans-serif" font-size="8" fill="#a89878" text-anchor="middle" font-weight="600">RAW</text>
+    <text x="35" y="30" font-family="'Courier New', monospace" font-size="5" fill="#887766" text-anchor="middle">RawFrame</text>
+
+    <!-- Wheels -->
+    <g transform="translate(14, 35)">
+      <circle cx="0" cy="5" r="4" fill="#3a3a4a" stroke="#666" stroke-width="1"/>
+      <circle cx="0" cy="5" r="1.5" fill="#555"/>
+    </g>
+    <g transform="translate(56, 35)">
+      <circle cx="0" cy="5" r="4" fill="#3a3a4a" stroke="#666" stroke-width="1"/>
+      <circle cx="0" cy="5" r="1.5" fill="#555"/>
+    </g>
+  </g>
+
+  <!-- ======================== -->
+  <!-- TRACK INFRASTRUCTURE     -->
+  <!-- ======================== -->
+  <g transform="translate(30, 560)">
+    <!-- train_track label -->
+    <rect x="0" y="0" width="180" height="40" rx="3" fill="#1e1e38" stroke="#3a3a5a" stroke-width="1"/>
+    <text x="90" y="14" font-family="'Courier New', monospace" font-size="7" fill="#00d4ff" text-anchor="middle" font-weight="700">train_track</text>
+    <text x="90" y="25" font-family="'Segoe UI', sans-serif" font-size="5.5" fill="#667" text-anchor="middle">Rail infrastructure: tracks, switches, signals</text>
+    <text x="90" y="34" font-family="'Segoe UI', sans-serif" font-size="5" fill="#556" text-anchor="middle">Frame spec | SwitchRail spec | Foundation layer</text>
+  </g>
+
+  <!-- Bogie label -->
+  <g transform="translate(230, 560)">
+    <rect x="0" y="0" width="140" height="40" rx="3" fill="#1e1e38" stroke="#3a3a5a" stroke-width="1"/>
+    <text x="70" y="14" font-family="'Courier New', monospace" font-size="7" fill="#888" text-anchor="middle" font-weight="700">bogie</text>
+    <text x="70" y="25" font-family="'Segoe UI', sans-serif" font-size="5.5" fill="#667" text-anchor="middle">Testing framework (wheel assemblies)</text>
+    <text x="70" y="34" font-family="sans-serif" font-size="5" fill="#556" text-anchor="middle" font-style="italic">"keeping everything on track"</text>
+  </g>
+
+  <!-- ================== -->
+  <!-- STEAM WISPS         -->
+  <!-- ================== -->
+  <g opacity="0.12">
+    <path d="M180,440 Q185,430 178,420 Q182,410 186,400" fill="none" stroke="#fff" stroke-width="1.5"/>
+    <path d="M200,438 Q208,425 202,415 Q207,405 212,395" fill="none" stroke="#fff" stroke-width="1"/>
+    <path d="M400,440 Q405,430 398,422" fill="none" stroke="#fff" stroke-width="1"/>
+  </g>
+
+  <!-- ============= -->
+  <!-- LEGEND         -->
+  <!-- ============= -->
+  <g transform="translate(835, 580)">
+    <rect x="0" y="0" width="340" height="195" rx="5" fill="#1a1a2e" stroke="#3a3a5a" stroke-width="1" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="340" height="20" rx="5" fill="#2a2a4a"/>
+    <rect x="0" y="14" width="340" height="6" fill="#2a2a4a"/>
+    <text x="170" y="14" font-family="'Segoe UI', sans-serif" font-size="8" fill="#ffa500" text-anchor="middle" font-weight="600" letter-spacing="2">LEGEND</text>
+
+    <!-- Layer 1: Protocols -->
+    <text x="15" y="38" font-family="'Segoe UI', sans-serif" font-size="6.5" fill="#ffa500" font-weight="600">TRACK LEVEL  (Protocol Primitives)</text>
+    <g transform="translate(15, 44)">
+      <line x1="0" y1="5" x2="20" y2="5" stroke="#00d4ff" stroke-width="2"/>
+      <text x="26" y="8" font-family="sans-serif" font-size="6" fill="#aaa">Main line = Core data pipeline</text>
+    </g>
+    <g transform="translate(170, 44)">
+      <rect x="0" y="0" width="12" height="8" rx="1" fill="#1a2a3a" stroke="#00d4ff" stroke-width="0.5"/>
+      <text x="18" y="7" font-family="sans-serif" font-size="6" fill="#aaa">Frame = Standard cargo unit</text>
+    </g>
+    <g transform="translate(15, 58)">
+      <line x1="0" y1="5" x2="10" y2="5" stroke="#ffa500" stroke-width="1.5"/>
+      <line x1="10" y1="5" x2="16" y2="1" stroke="#ffa500" stroke-width="1.5"/>
+      <text x="26" y="8" font-family="sans-serif" font-size="6" fill="#aaa">SwitchRail = Protocol converter</text>
+    </g>
+    <g transform="translate(170, 58)">
+      <circle cx="5" cy="5" r="3" fill="#44ff44" opacity="0.6"/>
+      <circle cx="14" cy="5" r="3" fill="#ff4444" opacity="0.6"/>
+      <text x="26" y="8" font-family="sans-serif" font-size="6" fill="#aaa">Signal = Connection state</text>
+    </g>
+
+    <!-- Layer 2: Yard -->
+    <text x="15" y="84" font-family="'Segoe UI', sans-serif" font-size="6.5" fill="#ffa500" font-weight="600">YARD LEVEL  (Routing / Shunts)</text>
+    <g transform="translate(15, 90)">
+      <rect x="0" y="0" width="14" height="8" rx="1" fill="url(#http-blue)" stroke="#6ab8ff" stroke-width="0.5"/>
+      <text x="20" y="7" font-family="sans-serif" font-size="6" fill="#aaa">HTTP carriage = Protocol handler</text>
+    </g>
+    <g transform="translate(170, 90)">
+      <rect x="0" y="0" width="14" height="8" rx="1" fill="url(#tls-green)" stroke="#c9a227" stroke-width="0.5"/>
+      <text x="20" y="7" font-family="sans-serif" font-size="6" fill="#aaa">TLS vault car = Encrypted handler</text>
+    </g>
+    <g transform="translate(15, 104)">
+      <rect x="0" y="0" width="14" height="8" rx="1" fill="#4a3a2a" stroke="#7a6a4a" stroke-width="0.5"/>
+      <text x="20" y="7" font-family="sans-serif" font-size="6" fill="#aaa">Raw freight = Raw bytes passthrough</text>
+    </g>
+    <g transform="translate(170, 104)">
+      <path d="M0,4 L6,0 L12,4 L6,8 Z" fill="none" stroke="#2d8a4e" stroke-width="0.8"/>
+      <text x="20" y="7" font-family="sans-serif" font-size="6" fill="#aaa">Shield = TLS encryption</text>
+    </g>
+
+    <!-- Layer 3: Signal Box -->
+    <text x="15" y="130" font-family="'Segoe UI', sans-serif" font-size="6.5" fill="#ffa500" font-weight="600">SIGNAL BOX  (High-Level API / Flows)</text>
+    <g transform="translate(15, 136)">
+      <rect x="0" y="0" width="14" height="6" rx="1" fill="#4a9eff"/>
+      <text x="20" y="6" font-family="sans-serif" font-size="6" fill="#aaa">Forward* = Predefined routing configs</text>
+    </g>
+    <g transform="translate(170, 136)">
+      <rect x="0" y="0" width="14" height="6" rx="1" fill="#ffa500" opacity="0.3" stroke="#ffa500" stroke-width="0.5"/>
+      <text x="20" y="6" font-family="sans-serif" font-size="6" fill="#aaa">Coupler = Master orchestrator</text>
+    </g>
+
+    <!-- Destinations -->
+    <text x="15" y="160" font-family="'Segoe UI', sans-serif" font-size="6.5" fill="#ffa500" font-weight="600">DESTINATIONS</text>
+    <g transform="translate(15, 166)">
+      <circle cx="4" cy="4" r="3" fill="#888" opacity="0.5"/>
+      <text x="12" y="7" font-family="sans-serif" font-size="5.5" fill="#999">TCP City = Plain TCP</text>
+    </g>
+    <g transform="translate(100, 166)">
+      <circle cx="4" cy="4" r="3" fill="#9b59b6" opacity="0.5"/>
+      <text x="12" y="7" font-family="sans-serif" font-size="5.5" fill="#999">Unix Tunnel = Unix sockets</text>
+    </g>
+    <g transform="translate(215, 166)">
+      <circle cx="4" cy="4" r="3" fill="#2d8a4e" opacity="0.5"/>
+      <text x="12" y="7" font-family="sans-serif" font-size="5.5" fill="#999">TLS Fortress = Encrypted</text>
+    </g>
+
+    <!-- Mapping key -->
+    <line x1="10" y1="180" x2="330" y2="180" stroke="#3a3a5a" stroke-width="0.5"/>
+    <text x="170" y="190" font-family="'Courier New', monospace" font-size="5.5" fill="#556" text-anchor="middle">Railway Term -> Code Concept  |  Station -> Processing Stage  |  Carriage -> Protocol Crate</text>
+  </g>
+
+  <!-- Version / project info -->
+  <text x="600" y="790" font-family="'Courier New', monospace" font-size="6" fill="#3a3a5a" text-anchor="middle">RAILSCALE ARCHITECTURE  -  A Railway-Inspired Software System</text>
+
+  <!-- Decorative corner marks -->
+  <path d="M10,10 L10,30 M10,10 L30,10" fill="none" stroke="#3a3a5a" stroke-width="0.5"/>
+  <path d="M1190,10 L1190,30 M1190,10 L1170,10" fill="none" stroke="#3a3a5a" stroke-width="0.5"/>
+  <path d="M10,790 L10,770 M10,790 L30,790" fill="none" stroke="#3a3a5a" stroke-width="0.5"/>
+  <path d="M1190,790 L1190,770 M1190,790 L1170,790" fill="none" stroke="#3a3a5a" stroke-width="0.5"/>
+</svg>

@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use tokio::io::AsyncRead;
 use tokio_stream::{Stream, StreamExt};
-use train_track::{Frame, FrameParser, ParsedData, RailscaleError};
+use train_track::{Frame, FrameParser, ParsedData};
 
 struct SimpleFrame(Bytes);
 

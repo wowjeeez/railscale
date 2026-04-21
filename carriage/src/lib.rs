@@ -7,9 +7,14 @@ pub mod http_v1 {
     pub use crate::http::codec::HttpStreamingCodec;
     pub use crate::http::parser::HttpParser;
     pub use crate::http::pipeline::HttpPipeline;
+    pub use crate::http::hook::HttpDeriverHook;
     pub mod derive {
         pub use crate::http::derive::*;
     }
+    pub mod response_codec {
+        pub use crate::http::response_codec::*;
+    }
+    pub use crate::http::response_parser::ResponseParser;
 }
 
 pub use http_v1::*;

@@ -2,8 +2,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use carriage::http_v1::{HttpParser, HttpPipeline};
 use carriage::init_metrics;
-use carriage::tcp::native::{TcpRouter, TcpSource};
-use train_track::{CancellationToken, DestinationRouter, FileDestination, Pipeline, RailscaleError, Service};
+use carriage::tcp::native::TcpSource;
+use train_track::{CancellationToken, DestinationRouter, FileDestination, NoHook, Pipeline, RailscaleError, Service};
 
 struct FileRouter;
 
@@ -40,6 +40,13 @@ async fn main() {
         error_responder: None,
         buffer_limits: Default::default(),
         drain_timeout: std::time::Duration::from_secs(30),
+        hook_factory: || NoHook,
+        response_parser_factory: None::<fn() -> HttpParser>,
+        response_pipeline: None,
+        response_hook_factory: None,
+        stabling_config: None,
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
         #[cfg(feature = "metrics-full")]
         recorder: None,
     };

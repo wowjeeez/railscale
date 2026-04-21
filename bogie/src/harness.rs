@@ -89,6 +89,48 @@ impl TestUpstream {
     }
 }
 
+impl TestUpstream {
+    pub async fn multi_response(status: u16, reason: &'static str, body: &'static str) -> Self {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handle = tokio::spawn(async move {
+            loop {
+                let (mut conn, _) = match listener.accept().await {
+                    Ok(c) => c,
+                    Err(_) => break,
+                };
+                tokio::spawn(async move {
+                    let mut buf = vec![0u8; 4096];
+                    loop {
+                        let mut request_buf = Vec::new();
+                        loop {
+                            match tokio::time::timeout(Duration::from_secs(5), conn.read(&mut buf)).await {
+                                Ok(Ok(0)) => return,
+                                Ok(Ok(n)) => {
+                                    request_buf.extend_from_slice(&buf[..n]);
+                                    if request_buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                                        break;
+                                    }
+                                }
+                                Ok(Err(_)) => return,
+                                Err(_) => return,
+                            }
+                        }
+                        let response = format!(
+                            "HTTP/1.1 {} {}\r\nContent-Length: {}\r\n\r\n{}",
+                            status, reason, body.len(), body
+                        );
+                        if conn.write_all(response.as_bytes()).await.is_err() {
+                            return;
+                        }
+                    }
+                });
+            }
+        });
+        Self { addr, handle }
+    }
+}
+
 impl Drop for TestUpstream {
     fn drop(&mut self) {
         self.handle.abort();
@@ -116,6 +158,47 @@ impl TestProxy {
                 error_responder: Some(Arc::new(HttpErrorResponder)),
                 buffer_limits: Default::default(),
                 drain_timeout: Duration::from_secs(30),
+                hook_factory: || NoHook,
+                response_parser_factory: None::<fn() -> HttpParser>,
+                response_pipeline: None,
+                response_hook_factory: None,
+                stabling_config: None,
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
+                #[cfg(feature = "metrics-full")]
+                recorder: None,
+            };
+            pipeline.run(CancellationToken::new()).await
+        });
+
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        Self { addr, handle }
+    }
+}
+
+impl TestProxy {
+    pub async fn new_with_keepalive(upstream_addr: &str) -> Self {
+        let source = TcpSource::bind("127.0.0.1:0").await.unwrap();
+        let addr = source.local_addr();
+        let router = Arc::new(TcpRouter::fixed(upstream_addr.to_string()));
+        let pipeline_proc = Arc::new(HttpPipeline::new(vec![]));
+
+        let handle = tokio::spawn(async move {
+            let pipeline = Pipeline {
+                source,
+                parser_factory: || HttpParser::new(vec![]),
+                pipeline: pipeline_proc,
+                router,
+                error_responder: Some(Arc::new(HttpErrorResponder)),
+                buffer_limits: Default::default(),
+                drain_timeout: Duration::from_secs(30),
+                hook_factory: || HttpDeriverHook::new(),
+                response_parser_factory: Some(|| ResponseParser::new()),
+                response_pipeline: None,
+                response_hook_factory: Some(|| HttpDeriverHook::new()),
+                stabling_config: Some(StablingConfig::default()),
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
                 #[cfg(feature = "metrics-full")]
                 recorder: None,
             };
@@ -223,6 +306,13 @@ impl TestTlsProxy {
                 error_responder: Some(Arc::new(HttpErrorResponder)),
                 buffer_limits: Default::default(),
                 drain_timeout: Duration::from_secs(30),
+                hook_factory: || NoHook,
+                response_parser_factory: None::<fn() -> HttpParser>,
+                response_pipeline: None,
+                response_hook_factory: None,
+                stabling_config: None,
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
                 #[cfg(feature = "metrics-full")]
                 recorder: None,
             };

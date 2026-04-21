@@ -25,6 +25,7 @@ pin_project! {
         #[pin]
         inner: FramedRead<T, HttpStreamingCodec>,
         headers_done: bool,
+        yielded_none: bool,
     }
 }
 
@@ -50,7 +51,17 @@ impl<T: AsyncRead + Unpin> Stream for HttpFrameStream<T> {
         if *this.headers_done {
             return match drain_buffer(inner) {
                 Some(data) => Poll::Ready(Some(Ok(data))),
-                None => Poll::Ready(None),
+                None if !*this.yielded_none => {
+                    *this.yielded_none = true;
+                    Poll::Ready(None)
+                }
+                None => {
+                    *this.headers_done = false;
+                    *this.yielded_none = false;
+                    inner.decoder_mut().reset();
+                    Pin::new(&mut *inner).poll_next(cx)
+                        .map(|opt| opt.map(|res| res.map(ParsedData::Parsed)))
+                }
             };
         }
 
@@ -87,6 +98,7 @@ impl<S: AsyncRead + Send + Unpin> FrameParser<S> for HttpParser {
         HttpFrameStream {
             inner: FramedRead::new(stream, codec),
             headers_done: false,
+            yielded_none: false,
         }
     }
 }

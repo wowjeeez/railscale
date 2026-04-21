@@ -3,28 +3,27 @@ use train_track::{Departure, StreamDeparture, StreamDestination, Transload, Chan
 
 struct MockDestination {
     written: Vec<Bytes>,
+    empty: tokio::io::Empty,
 }
 
 impl MockDestination {
     fn new() -> Self {
-        Self { written: Vec::new() }
+        Self { written: Vec::new(), empty: tokio::io::empty() }
     }
 }
 
 #[async_trait::async_trait]
 impl StreamDestination for MockDestination {
     type Error = RailscaleError;
+    type ResponseReader = tokio::io::Empty;
 
     async fn write(&mut self, bytes: Bytes) -> Result<(), Self::Error> {
         self.written.push(bytes);
         Ok(())
     }
 
-    async fn relay_response<W: tokio::io::AsyncWrite + Send + Unpin>(
-        &mut self,
-        _client: &mut W,
-    ) -> Result<u64, Self::Error> {
-        Ok(0)
+    fn response_reader(&mut self) -> &mut tokio::io::Empty {
+        &mut self.empty
     }
 }
 
@@ -37,12 +36,10 @@ async fn stream_departure_delegates_write() {
 }
 
 #[tokio::test]
-async fn stream_departure_delegates_relay() {
+async fn stream_departure_exposes_response_reader() {
     let mock = MockDestination::new();
     let mut departure = StreamDeparture::new(mock);
-    let mut buf = Vec::new();
-    let bytes = departure.relay_response(&mut buf).await.unwrap();
-    assert_eq!(bytes, 0);
+    let _reader = departure.response_reader();
 }
 
 #[tokio::test]
@@ -64,12 +61,10 @@ async fn channel_transload_errors_on_closed_channel() {
 }
 
 #[tokio::test]
-async fn channel_transload_relay_returns_zero() {
+async fn channel_transload_exposes_response_reader() {
     let (tx, _rx) = tokio::sync::mpsc::channel(16);
     let mut transload = ChannelTransload::new(tx);
-    let mut buf = Vec::new();
-    let bytes = transload.relay_response(&mut buf).await.unwrap();
-    assert_eq!(bytes, 0);
+    let _reader = transload.response_reader();
 }
 
 #[test]

@@ -5,7 +5,7 @@ use tokio::net::TcpStream;
 use rustls::pki_types::ServerName;
 use tokio_rustls::TlsConnector;
 use tokio_util::sync::CancellationToken;
-use train_track::{Pipeline, BufferLimits, Service};
+use train_track::{Pipeline, BufferLimits, NoHook, Service};
 use trezorcarriage::{TlsParser, TlsPassthroughPipeline, Passthrough};
 use carriage::tcp::native::{TcpSource, TcpRouter};
 
@@ -27,6 +27,13 @@ async fn start_passthrough_proxy(upstream_addr: &str) -> (std::net::SocketAddr, 
             error_responder: None,
             buffer_limits: BufferLimits::default(),
             drain_timeout: Duration::from_secs(5),
+            hook_factory: || NoHook,
+            response_parser_factory: None::<fn() -> TlsParser>,
+            response_pipeline: None,
+            response_hook_factory: None,
+            stabling_config: None,
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
         };
         let _ = pipeline.run(cancel).await;
     });

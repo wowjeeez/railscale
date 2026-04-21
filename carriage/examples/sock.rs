@@ -5,7 +5,7 @@ use carriage::init_metrics;
 use carriage::tcp::native::{TcpRouter};
 use std::sync::Arc;
 use carriage::tcp::unix_sockets::SockSource;
-use train_track::{CancellationToken, Pipeline, Service};
+use train_track::{CancellationToken, NoHook, Pipeline, Service};
 
 #[tokio::main]
 async fn main() {
@@ -34,6 +34,13 @@ async fn main() {
         error_responder: Some(Arc::new(carriage::http_v1::HttpErrorResponder)),
         buffer_limits: Default::default(),
         drain_timeout: std::time::Duration::from_secs(30),
+        hook_factory: || NoHook,
+        response_parser_factory: None::<fn() -> HttpParser>,
+        response_pipeline: None,
+        response_hook_factory: None,
+        stabling_config: None,
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
         #[cfg(feature = "metrics-full")]
         recorder: None,
     };

@@ -40,8 +40,20 @@ fn body_phase() {
 
 #[test]
 fn phase_ordering() {
-    assert!(HttpPhase::RequestLine < HttpPhase::Header);
+    assert!(HttpPhase::RequestLine < HttpPhase::StatusLine);
+    assert!(HttpPhase::StatusLine < HttpPhase::Header);
     assert!(HttpPhase::Header < HttpPhase::EndOfHeaders);
     assert!(HttpPhase::EndOfHeaders < HttpPhase::Body);
     assert!(HttpPhase::Body < HttpPhase::Trailer);
+}
+
+#[test]
+fn status_line_frame_properties() {
+    use train_track::FramePhase;
+    let frame = HttpFrame::status_line(Bytes::from_static(b"HTTP/1.1 200 OK\r\n"));
+    assert_eq!(frame.phase(), HttpPhase::StatusLine);
+    assert!(frame.is_status_line());
+    assert_eq!(frame.routing_key(), None);
+    assert_eq!(frame.as_bytes(), b"HTTP/1.1 200 OK\r\n");
+    assert!(!HttpPhase::StatusLine.is_reorderable());
 }

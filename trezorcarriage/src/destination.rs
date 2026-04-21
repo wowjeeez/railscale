@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 use bytes::Bytes;
-use tokio::io::{AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncWriteExt, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 use rustls::ClientConfig;
 use tokio_rustls::TlsConnector;
@@ -9,14 +9,17 @@ use tokio_rustls::client::TlsStream;
 use train_track::{StreamDestination, DestinationRouter, RailscaleError, ErrorKind};
 
 pub struct TlsStreamDestination {
-    upstream: TlsStream<TcpStream>,
+    read_half: ReadHalf<TlsStream<TcpStream>>,
+    write_half: WriteHalf<TlsStream<TcpStream>>,
     inactivity_timeout: Option<Duration>,
 }
 
 impl TlsStreamDestination {
     pub fn new(stream: TlsStream<TcpStream>) -> Self {
+        let (read_half, write_half) = tokio::io::split(stream);
         Self {
-            upstream: stream,
+            read_half,
+            write_half,
             inactivity_timeout: None,
         }
     }
@@ -25,25 +28,19 @@ impl TlsStreamDestination {
         self.inactivity_timeout = Some(d);
         self
     }
-
-    pub fn upstream_mut(&mut self) -> &mut TlsStream<TcpStream> {
-        &mut self.upstream
-    }
 }
 
 #[async_trait::async_trait]
 impl StreamDestination for TlsStreamDestination {
     type Error = std::io::Error;
+    type ResponseReader = ReadHalf<TlsStream<TcpStream>>;
 
     async fn write(&mut self, bytes: Bytes) -> Result<(), Self::Error> {
-        self.upstream.write_all(&bytes).await
+        self.write_half.write_all(&bytes).await
     }
 
-    async fn relay_response<W: AsyncWrite + Send + Unpin>(
-        &mut self,
-        client: &mut W,
-    ) -> Result<u64, Self::Error> {
-        tokio::io::copy(&mut self.upstream, client).await
+    fn response_reader(&mut self) -> &mut ReadHalf<TlsStream<TcpStream>> {
+        &mut self.read_half
     }
 }
 

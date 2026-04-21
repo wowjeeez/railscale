@@ -16,7 +16,7 @@ impl TlsParser {
     }
 }
 
-impl<S: AsyncRead + Send + Unpin + 'static> FrameParser<S> for TlsParser {
+impl<S: AsyncRead + Send + Unpin> FrameParser<S> for TlsParser {
     type Frame = TlsEncryptedFrame;
     type Error = io::Error;
 

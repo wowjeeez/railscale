@@ -2,7 +2,7 @@ use std::pin::pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use bytes::Bytes;
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, DuplexStream, ReadHalf, WriteHalf};
+use tokio::io::{AsyncRead, AsyncWriteExt, DuplexStream, ReadHalf, WriteHalf};
 use tokio_stream::{Stream, StreamExt};
 use train_track::*;
 
@@ -50,25 +50,27 @@ impl FramePipeline for NoopPipeline {
 
 struct CountingDestination {
     written: Arc<AtomicUsize>,
+    empty: tokio::io::Empty,
 }
 impl CountingDestination {
     fn new() -> (Self, Arc<AtomicUsize>) {
         let w = Arc::new(AtomicUsize::new(0));
-        (Self { written: w.clone() }, w)
+        (Self { written: w.clone(), empty: tokio::io::empty() }, w)
     }
 }
 
 #[async_trait::async_trait]
 impl StreamDestination for CountingDestination {
     type Error = std::io::Error;
+    type ResponseReader = tokio::io::Empty;
 
     async fn write(&mut self, _bytes: Bytes) -> Result<(), Self::Error> {
         self.written.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 
-    async fn relay_response<W: AsyncWrite + Send + Unpin>(&mut self, _client: &mut W) -> Result<u64, Self::Error> {
-        Ok(0)
+    fn response_reader(&mut self) -> &mut tokio::io::Empty {
+        &mut self.empty
     }
 }
 

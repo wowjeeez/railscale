@@ -1,27 +1,29 @@
 use bytes::Bytes;
-use train_track::{StreamDestination, RailscaleError};
+use train_track::StreamDestination;
 
 struct CollectDestination {
     chunks: Vec<Bytes>,
+    empty: tokio::io::Empty,
 }
 
 impl CollectDestination {
     fn new() -> Self {
-        Self { chunks: vec![] }
+        Self { chunks: vec![], empty: tokio::io::empty() }
     }
 }
 
 #[async_trait::async_trait]
 impl StreamDestination for CollectDestination {
     type Error = std::io::Error;
+    type ResponseReader = tokio::io::Empty;
 
     async fn write(&mut self, bytes: Bytes) -> Result<(), Self::Error> {
         self.chunks.push(bytes);
         Ok(())
     }
 
-    async fn relay_response<W: tokio::io::AsyncWrite + Send + Unpin>(&mut self, _client: &mut W) -> Result<u64, Self::Error> {
-        Ok(0)
+    fn response_reader(&mut self) -> &mut tokio::io::Empty {
+        &mut self.empty
     }
 }
 

@@ -1,4 +1,3 @@
-use std::time::Duration;
 use train_track::BufferLimits;
 use coupler::ForwardTls;
 

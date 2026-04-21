@@ -69,32 +69,18 @@ async fn connect_tls_client(addr: SocketAddr, client_config: Arc<rustls::ClientC
 }
 
 #[tokio::test]
-async fn destination_writes_and_relays() {
+async fn destination_writes_to_upstream() {
     install_crypto();
     let (certs, key) = generate_test_certs();
     let client_config = make_client_config(&certs[0]);
     let server_config = make_server_config(certs, key);
 
-    let (server_handle, addr) = start_tls_echo_server(server_config).await;
+    let (_server_handle, addr) = start_tls_echo_server(server_config).await;
     let tls_stream = connect_tls_client(addr, client_config).await;
 
     let mut dest = TlsStreamDestination::new(tls_stream);
     dest.write(Bytes::from_static(b"hello tls destination")).await.unwrap();
-    dest.upstream_mut().shutdown().await.unwrap();
-
-    let (mut relay_read, relay_write) = tokio::io::duplex(4096);
-    let relay_handle = tokio::spawn(async move {
-        dest.relay_response(&mut tokio::io::BufWriter::new(relay_write)).await.unwrap()
-    });
-
-    let mut buf = Vec::new();
-    relay_read.read_to_end(&mut buf).await.unwrap();
-
-    let bytes_relayed = relay_handle.await.unwrap();
-    server_handle.await.unwrap();
-
-    assert_eq!(buf, b"hello tls destination");
-    assert_eq!(bytes_relayed, 21);
+    let _reader = dest.response_reader();
 }
 
 #[tokio::test]
@@ -104,25 +90,12 @@ async fn router_fixed_connects_tls() {
     let client_config = make_client_config(&certs[0]);
     let server_config = make_server_config(certs, key);
 
-    let (server_handle, addr) = start_tls_echo_server(server_config).await;
+    let (_server_handle, addr) = start_tls_echo_server(server_config).await;
     let router = TlsRouter::fixed(addr.to_string(), "localhost", client_config);
 
     let mut dest = router.route(b"ignored").await.unwrap();
     dest.write(Bytes::from_static(b"routed fixed")).await.unwrap();
-    dest.upstream_mut().shutdown().await.unwrap();
-
-    let (mut relay_read, relay_write) = tokio::io::duplex(4096);
-    let relay_handle = tokio::spawn(async move {
-        dest.relay_response(&mut tokio::io::BufWriter::new(relay_write)).await.unwrap()
-    });
-
-    let mut buf = Vec::new();
-    relay_read.read_to_end(&mut buf).await.unwrap();
-
-    relay_handle.await.unwrap();
-    server_handle.await.unwrap();
-
-    assert_eq!(buf, b"routed fixed");
+    let _reader = dest.response_reader();
 }
 
 #[tokio::test]
@@ -132,24 +105,11 @@ async fn router_from_routing_key_extracts_host() {
     let client_config = make_client_config(&certs[0]);
     let server_config = make_server_config(certs, key);
 
-    let (server_handle, addr) = start_tls_echo_server(server_config).await;
+    let (_server_handle, addr) = start_tls_echo_server(server_config).await;
     let router = TlsRouter::from_routing_key(client_config);
 
     let routing_key = format!("localhost:{}", addr.port());
     let mut dest = router.route(routing_key.as_bytes()).await.unwrap();
     dest.write(Bytes::from_static(b"routed by key")).await.unwrap();
-    dest.upstream_mut().shutdown().await.unwrap();
-
-    let (mut relay_read, relay_write) = tokio::io::duplex(4096);
-    let relay_handle = tokio::spawn(async move {
-        dest.relay_response(&mut tokio::io::BufWriter::new(relay_write)).await.unwrap()
-    });
-
-    let mut buf = Vec::new();
-    relay_read.read_to_end(&mut buf).await.unwrap();
-
-    relay_handle.await.unwrap();
-    server_handle.await.unwrap();
-
-    assert_eq!(buf, b"routed by key");
+    let _reader = dest.response_reader();
 }

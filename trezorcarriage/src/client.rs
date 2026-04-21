@@ -1,20 +1,22 @@
 use std::sync::Arc;
 use std::time::Duration;
 use bytes::Bytes;
-use tokio::io::{AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncWriteExt, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
 use rustls::pki_types::ServerName;
 use train_track::{StreamDestination, DestinationRouter, ErrorKind, RailscaleError};
 
 pub struct TlsClientDestination {
-    stream: tokio_rustls::client::TlsStream<TcpStream>,
+    read_half: ReadHalf<tokio_rustls::client::TlsStream<TcpStream>>,
+    write_half: WriteHalf<tokio_rustls::client::TlsStream<TcpStream>>,
     inactivity_timeout: Option<Duration>,
 }
 
 impl TlsClientDestination {
     pub fn new(stream: tokio_rustls::client::TlsStream<TcpStream>) -> Self {
-        Self { stream, inactivity_timeout: None }
+        let (read_half, write_half) = tokio::io::split(stream);
+        Self { read_half, write_half, inactivity_timeout: None }
     }
 
     pub fn with_timeout(mut self, d: Duration) -> Self {
@@ -26,37 +28,14 @@ impl TlsClientDestination {
 #[async_trait::async_trait]
 impl StreamDestination for TlsClientDestination {
     type Error = std::io::Error;
+    type ResponseReader = ReadHalf<tokio_rustls::client::TlsStream<TcpStream>>;
 
     async fn write(&mut self, bytes: Bytes) -> Result<(), Self::Error> {
-        self.stream.write_all(&bytes).await
+        self.write_half.write_all(&bytes).await
     }
 
-    async fn relay_response<W: AsyncWrite + Send + Unpin>(
-        &mut self,
-        client: &mut W,
-    ) -> Result<u64, Self::Error> {
-        match self.inactivity_timeout {
-            Some(timeout) => {
-                let mut buf = [0u8; 8192];
-                let mut total: u64 = 0;
-                use tokio::io::AsyncReadExt;
-                loop {
-                    tokio::select! {
-                        result = self.stream.read(&mut buf) => {
-                            let n = result?;
-                            if n == 0 { break; }
-                            client.write_all(&buf[..n]).await?;
-                            total += n as u64;
-                        }
-                        _ = tokio::time::sleep(timeout) => {
-                            return Err(std::io::Error::new(std::io::ErrorKind::TimedOut, "inactivity timeout"));
-                        }
-                    }
-                }
-                Ok(total)
-            }
-            None => tokio::io::copy(&mut self.stream, client).await,
-        }
+    fn response_reader(&mut self) -> &mut Self::ResponseReader {
+        &mut self.read_half
     }
 }
 

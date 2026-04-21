@@ -24,6 +24,13 @@ async fn spawn_proxy_simple(upstream_addr: String) -> (std::net::SocketAddr, tok
             error_responder: None,
             buffer_limits: Default::default(),
             drain_timeout: Duration::from_secs(30),
+            hook_factory: || NoHook,
+            response_parser_factory: None::<fn() -> HttpParser>,
+            response_pipeline: None,
+            response_hook_factory: None,
+            stabling_config: None,
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
             #[cfg(feature = "metrics-full")]
             recorder: None,
         };
@@ -68,6 +75,13 @@ async fn full_http_pipeline_end_to_end() {
             error_responder: None,
             buffer_limits: Default::default(),
             drain_timeout: Duration::from_secs(30),
+            hook_factory: || NoHook,
+            response_parser_factory: None::<fn() -> HttpParser>,
+            response_pipeline: None,
+            response_hook_factory: None,
+            stabling_config: None,
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
             #[cfg(feature = "metrics-full")]
             recorder: None,
         };
@@ -113,6 +127,13 @@ async fn malformed_http_request_returns_error() {
             error_responder: Some(Arc::new(HttpErrorResponder)),
             buffer_limits: Default::default(),
             drain_timeout: Duration::from_secs(30),
+            hook_factory: || NoHook,
+            response_parser_factory: None::<fn() -> HttpParser>,
+            response_pipeline: None,
+            response_hook_factory: None,
+            stabling_config: None,
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
             #[cfg(feature = "metrics-full")]
             recorder: None,
         };
@@ -346,6 +367,13 @@ async fn unix_socket_end_to_end() {
             error_responder: None,
             buffer_limits: Default::default(),
             drain_timeout: Duration::from_secs(30),
+            hook_factory: || NoHook,
+            response_parser_factory: None::<fn() -> HttpParser>,
+            response_pipeline: None,
+            response_hook_factory: None,
+            stabling_config: None,
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
             #[cfg(feature = "metrics-full")]
             recorder: None,
         };
@@ -388,6 +416,13 @@ async fn upstream_connection_refused() {
             error_responder: Some(Arc::new(HttpErrorResponder)),
             buffer_limits: Default::default(),
             drain_timeout: Duration::from_secs(30),
+            hook_factory: || NoHook,
+            response_parser_factory: None::<fn() -> HttpParser>,
+            response_pipeline: None,
+            response_hook_factory: None,
+            stabling_config: None,
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
             #[cfg(feature = "metrics-full")]
             recorder: None,
         };

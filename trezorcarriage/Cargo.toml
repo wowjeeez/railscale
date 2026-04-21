@@ -16,6 +16,9 @@ pin-project-lite = { workspace = true }
 async-trait = { workspace = true }
 async-stream = { workspace = true }
 
+[features]
+capture = ["train_track/capture"]
+
 [dev-dependencies]
 rcgen = { workspace = true }
 rustls-pemfile = { workspace = true }

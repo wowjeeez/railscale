@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::net::SocketAddr;
 use tokio_util::sync::CancellationToken;
-use train_track::{Pipeline, Service, BufferLimits, RailscaleError, ErrorKind};
+use train_track::{Pipeline, Service, BufferLimits, RailscaleError, ErrorKind, NoHook};
 use trezorcarriage::{TlsParser, TlsPassthroughPipeline, Passthrough};
 use carriage::tcp::native::{TcpSource, TcpRouter};
 
@@ -46,6 +46,13 @@ impl ForwardTls {
             error_responder: None,
             buffer_limits: self.buffer_limits,
             drain_timeout: self.drain_timeout,
+            hook_factory: || NoHook,
+            response_parser_factory: None::<fn() -> TlsParser>,
+            response_pipeline: None,
+            response_hook_factory: None,
+            stabling_config: None,
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
         };
         pipeline.run(cancel).await
     }

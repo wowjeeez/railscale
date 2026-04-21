@@ -3,10 +3,10 @@ use std::sync::Arc;
 use std::time::Duration;
 use bytes::Bytes;
 use memchr::memmem::Finder;
-use carriage::http_v1::{HttpParser, HttpPipeline, HttpErrorResponder};
+use carriage::http_v1::{HttpParser, HttpPipeline, HttpErrorResponder, HttpDeriverHook, ResponseParser};
 use carriage::tcp::native::{TcpSource,TcpRouter};
 use carriage::tcp::unix_sockets::{SockSource, TcpOverSockRouter};
-use train_track::{Pipeline, Service, RailscaleError, CancellationToken, BufferLimits};
+use train_track::{Pipeline, Service, RailscaleError, CancellationToken, BufferLimits, StablingConfig};
 
 #[cfg(feature = "metrics-full")]
 use train_track::recorder::start_recorder;
@@ -186,11 +186,18 @@ impl TcpBuilder {
                 let p = Pipeline {
                     source,
                     parser_factory: || HttpParser::new(vec![]),
-                    pipeline: Arc::new(HttpPipeline::new(matchers)),
+                    pipeline: Arc::new(HttpPipeline::keepalive(matchers)),
                     router: build_router!(tcp addr),
                     error_responder,
                     buffer_limits,
                     drain_timeout: drain,
+                    hook_factory: || HttpDeriverHook::new(),
+                    response_parser_factory: Some(|| ResponseParser::new()),
+                    response_pipeline: Some(Arc::new(HttpPipeline::keepalive(vec![]))),
+                    response_hook_factory: Some(|| HttpDeriverHook::new()),
+                    stabling_config: Some(StablingConfig::default()),
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
                     #[cfg(feature = "metrics-full")]
                     recorder,
                 };
@@ -200,11 +207,18 @@ impl TcpBuilder {
                 let p = Pipeline {
                     source,
                     parser_factory: || HttpParser::new(vec![]),
-                    pipeline: Arc::new(HttpPipeline::new(matchers)),
+                    pipeline: Arc::new(HttpPipeline::keepalive(matchers)),
                     router: build_router!(sock path),
                     error_responder,
                     buffer_limits,
                     drain_timeout: drain,
+                    hook_factory: || HttpDeriverHook::new(),
+                    response_parser_factory: Some(|| ResponseParser::new()),
+                    response_pipeline: Some(Arc::new(HttpPipeline::keepalive(vec![]))),
+                    response_hook_factory: Some(|| HttpDeriverHook::new()),
+                    stabling_config: Some(StablingConfig::default()),
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
                     #[cfg(feature = "metrics-full")]
                     recorder,
                 };
@@ -214,11 +228,18 @@ impl TcpBuilder {
                 let p = Pipeline {
                     source,
                     parser_factory: || HttpParser::new(vec![]),
-                    pipeline: Arc::new(HttpPipeline::new(matchers)),
+                    pipeline: Arc::new(HttpPipeline::keepalive(matchers)),
                     router: build_router!(dynamic),
                     error_responder,
                     buffer_limits,
                     drain_timeout: drain,
+                    hook_factory: || HttpDeriverHook::new(),
+                    response_parser_factory: Some(|| ResponseParser::new()),
+                    response_pipeline: Some(Arc::new(HttpPipeline::keepalive(vec![]))),
+                    response_hook_factory: Some(|| HttpDeriverHook::new()),
+                    stabling_config: Some(StablingConfig::default()),
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
                     #[cfg(feature = "metrics-full")]
                     recorder,
                 };
@@ -308,11 +329,18 @@ impl SockBuilder<HasRoute> {
                 let p = Pipeline {
                     source,
                     parser_factory: || HttpParser::new(vec![]),
-                    pipeline: Arc::new(HttpPipeline::new(matchers)),
+                    pipeline: Arc::new(HttpPipeline::keepalive(matchers)),
                     router: Arc::new(r),
                     error_responder,
                     buffer_limits,
                     drain_timeout: drain,
+                    hook_factory: || HttpDeriverHook::new(),
+                    response_parser_factory: Some(|| ResponseParser::new()),
+                    response_pipeline: Some(Arc::new(HttpPipeline::keepalive(vec![]))),
+                    response_hook_factory: Some(|| HttpDeriverHook::new()),
+                    stabling_config: Some(StablingConfig::default()),
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
                     #[cfg(feature = "metrics-full")]
                     recorder,
                 };
@@ -326,11 +354,18 @@ impl SockBuilder<HasRoute> {
                 let p = Pipeline {
                     source,
                     parser_factory: || HttpParser::new(vec![]),
-                    pipeline: Arc::new(HttpPipeline::new(matchers)),
+                    pipeline: Arc::new(HttpPipeline::keepalive(matchers)),
                     router: Arc::new(r),
                     error_responder,
                     buffer_limits,
                     drain_timeout: drain,
+                    hook_factory: || HttpDeriverHook::new(),
+                    response_parser_factory: Some(|| ResponseParser::new()),
+                    response_pipeline: Some(Arc::new(HttpPipeline::keepalive(vec![]))),
+                    response_hook_factory: Some(|| HttpDeriverHook::new()),
+                    stabling_config: Some(StablingConfig::default()),
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
                     #[cfg(feature = "metrics-full")]
                     recorder,
                 };

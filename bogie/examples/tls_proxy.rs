@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 use rustls::crypto::ring::default_provider;
-use train_track::{Pipeline, CancellationToken, BufferLimits, Service};
+use train_track::{Pipeline, CancellationToken, BufferLimits, NoHook, Service};
 use carriage::http_v1::{HttpParser, HttpPipeline, HttpErrorResponder};
 use carriage::tcp::native::TcpRouter;
 use trezorcarriage::TlsSource;
@@ -47,6 +47,13 @@ async fn main() {
         error_responder: Some(Arc::new(HttpErrorResponder)),
         buffer_limits: BufferLimits::default(),
         drain_timeout: Duration::from_secs(30),
+        hook_factory: || NoHook,
+        response_parser_factory: None::<fn() -> HttpParser>,
+        response_pipeline: None,
+        response_hook_factory: None,
+        stabling_config: None,
+            turnout_name: "proxy".to_string(),
+            capture_dir: None,
         #[cfg(feature = "metrics-full")]
         recorder: None,
     };

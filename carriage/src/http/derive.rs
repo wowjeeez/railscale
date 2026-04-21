@@ -45,8 +45,8 @@ impl MatchAtom for Matcher {
             Matcher::HeaderName(_) => HttpPhase::Header,
             Matcher::RequestLineVersion
             | Matcher::RequestLineMethod
-            | Matcher::RequestLineUri
-            | Matcher::StatusCode => HttpPhase::RequestLine,
+            | Matcher::RequestLineUri => HttpPhase::RequestLine,
+            Matcher::StatusCode => HttpPhase::StatusLine,
         }
     }
 

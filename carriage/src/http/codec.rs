@@ -35,6 +35,11 @@ impl HttpStreamingCodec {
     pub fn headers_done(&self) -> bool {
         self.done
     }
+
+    pub fn reset(&mut self) {
+        self.done = false;
+        self.first_line = true;
+    }
 }
 
 impl Decoder for HttpStreamingCodec {
@@ -62,6 +67,13 @@ impl Decoder for HttpStreamingCodec {
             Some(pos) => {
                 let is_request_line = self.first_line;
                 self.first_line = false;
+
+                if !is_request_line && (src[0] == b' ' || src[0] == b'\t') {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "obs-fold in header (RFC 9112 §5.2)",
+                    ));
+                }
 
                 let line = src.split_to(pos + 2).freeze();
 
